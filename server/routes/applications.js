@@ -1,13 +1,27 @@
 const express = require('express');
 const router = express.Router();
+const { Op } = require('sequelize');
 const MarriageApplication = require('../models/MarriageApplication');
 const { auth, authorize } = require('../middleware/auth-simple');
 
 // @route   GET /api/applications
-// @desc    Get applications based on user role
+// @desc    Get applications with pagination, filtering, and search based on user role
 // @access  Private
 router.get('/', auth, async (req, res) => {
     try {
+        // Extract query parameters
+        const {
+            page = 1,
+            limit = 10,
+            search = '',
+            status = '',
+            sortBy = 'createdAt',
+            sortOrder = 'DESC'
+        } = req.query;
+
+        // Calculate offset for pagination
+        const offset = (parseInt(page) - 1) * parseInt(limit);
+
         let query = {};
 
         // Get user details first
@@ -38,23 +52,52 @@ router.get('/', auth, async (req, res) => {
             // Remove status filter to show all applications including approved ones
         }
 
+        // Add search functionality
+        if (search) {
+            query[Op.or] = [
+                { applicationNumber: { [Op.like]: `%${search}%` } },
+                { groomFirstName: { [Op.like]: `%${search}%` } },
+                { groomLastName: { [Op.like]: `%${search}%` } },
+                { brideFirstName: { [Op.like]: `%${search}%` } },
+                { brideLastName: { [Op.like]: `%${search}%` } }
+            ];
+        }
+
+        // Add status filter if provided
+        if (status) {
+            query.status = status;
+        }
+
+        // Get total count for pagination
+        const totalCount = await MarriageApplication.count({ where: query });
+
+        // Get applications with pagination and filtering
         const applications = await MarriageApplication.findAll({
             where: query,
-            order: [['createdAt', 'DESC']]
+            order: [[sortBy, sortOrder.toUpperCase()]],
+            limit: parseInt(limit),
+            offset: offset
         });
 
-        console.log('Query used:', query);
-        console.log('Applications found:', applications.length);
-        console.log('Applications:', applications.map(app => ({
-            id: app.id,
-            applicationNumber: app.applicationNumber,
-            sectorId: app.sectorId,
-            userId: app.userId,
-            groomFirstName: app.groomFirstName,
-            groomLastName: app.groomLastName
-        })));
+        // Calculate pagination info
+        const totalPages = Math.ceil(totalCount / parseInt(limit));
+        const hasNextPage = parseInt(page) < totalPages;
+        const hasPrevPage = parseInt(page) > 1;
 
-        res.json({ applications });
+        console.log('Query used:', query);
+        console.log('Applications found:', applications.length, 'Total:', totalCount);
+
+        res.json({
+            applications,
+            pagination: {
+                currentPage: parseInt(page),
+                totalPages,
+                totalCount,
+                hasNextPage,
+                hasPrevPage,
+                limit: parseInt(limit)
+            }
+        });
     } catch (error) {
         console.error('Get applications error:', error);
         res.status(500).json({ message: 'Server error' });

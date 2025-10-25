@@ -30,6 +30,8 @@ import {
     DialogContent,
     DialogActions,
     DialogContentText,
+    Pagination,
+    Stack,
 } from '@mui/material';
 import {
     Add as AddIcon,
@@ -55,26 +57,40 @@ const ChurchMembers = () => {
     // Search and filter state
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [memberToDelete, setMemberToDelete] = useState(null);
 
-    // Fetch church members
+    // Build query parameters
+    const queryParams = useMemo(() => {
+        const params = new URLSearchParams();
+        params.append('page', currentPage.toString());
+        params.append('limit', pageSize.toString());
+        if (searchTerm) params.append('search', searchTerm);
+        if (statusFilter !== 'all') params.append('status', statusFilter);
+        return params.toString();
+    }, [currentPage, pageSize, searchTerm, statusFilter]);
+
+    // Fetch church members with pagination and filtering
     const { data: membersData, isLoading, error } = useQuery(
-        'church-members',
-        () => api.get('/church-members').then(res => res.data),
+        ['church-members', queryParams],
+        () => api.get(`/church-members?${queryParams}`).then(res => res.data),
         {
             enabled: !!user,
+            keepPreviousData: true,
         }
     );
 
     const members = membersData?.members || [];
+    const pagination = membersData?.pagination || {};
 
     // Delete member mutation
     const deleteMutation = useMutation(
         (memberId) => api.delete(`/church-members/${memberId}`),
         {
             onSuccess: () => {
-                queryClient.invalidateQueries('church-members');
+                queryClient.invalidateQueries(['church-members']);
                 toast.success('Church member deleted successfully');
                 setDeleteDialogOpen(false);
                 setMemberToDelete(null);
@@ -95,20 +111,7 @@ const ChurchMembers = () => {
         }
     };
 
-    // Filter members based on search term and filters
-    const filteredMembers = useMemo(() => {
-        return members.filter(member => {
-            const matchesSearch = searchTerm === '' ||
-                member.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                member.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                member.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                member.membershipNumber?.toLowerCase().includes(searchTerm.toLowerCase());
-
-            const matchesStatus = statusFilter === 'all' || member.membershipStatus === statusFilter;
-
-            return matchesSearch && matchesStatus;
-        });
-    }, [members, searchTerm, statusFilter]);
+    // Server-side filtering is now handled by the API
 
     const handleCreateMember = () => {
         navigate('/dashboard/church-members/new');
@@ -176,53 +179,74 @@ const ChurchMembers = () => {
                 />
 
                 {/* Search and Filter Section */}
-                {members && members.length > 0 && (
-                    <Card sx={{ mb: 3 }}>
-                        <CardContent>
-                            <Grid container spacing={2} alignItems="center">
-                                <Grid item xs={12} md={6}>
-                                    <TextField
-                                        fullWidth
-                                        placeholder="Search members..."
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                        InputProps={{
-                                            startAdornment: (
-                                                <InputAdornment position="start">
-                                                    <SearchIcon />
-                                                </InputAdornment>
-                                            ),
-                                        }}
-                                        size="small"
-                                    />
-                                </Grid>
-                                <Grid item xs={12} md={3}>
-                                    <FormControl fullWidth size="small">
-                                        <InputLabel>Status Filter</InputLabel>
-                                        <Select
-                                            value={statusFilter}
-                                            label="Status Filter"
-                                            onChange={(e) => setStatusFilter(e.target.value)}
-                                        >
-                                            <MenuItem value="all">All Statuses</MenuItem>
-                                            <MenuItem value="active">Active</MenuItem>
-                                            <MenuItem value="inactive">Inactive</MenuItem>
-                                            <MenuItem value="suspended">Suspended</MenuItem>
-                                            <MenuItem value="transferred">Transferred</MenuItem>
-                                        </Select>
-                                    </FormControl>
-                                </Grid>
-                                <Grid item xs={12} md={3}>
-                                    <Typography variant="body2" color="text.secondary">
-                                        Showing {filteredMembers.length} of {members.length} members
-                                    </Typography>
-                                </Grid>
+                <Card sx={{ mb: 3 }}>
+                    <CardContent>
+                        <Grid container spacing={2} alignItems="center">
+                            <Grid item xs={12} md={4}>
+                                <TextField
+                                    fullWidth
+                                    placeholder="Search members..."
+                                    value={searchTerm}
+                                    onChange={(e) => {
+                                        setSearchTerm(e.target.value);
+                                        setCurrentPage(1); // Reset to first page when searching
+                                    }}
+                                    InputProps={{
+                                        startAdornment: (
+                                            <InputAdornment position="start">
+                                                <SearchIcon />
+                                            </InputAdornment>
+                                        ),
+                                    }}
+                                />
                             </Grid>
-                        </CardContent>
-                    </Card>
-                )}
+                            <Grid item xs={12} md={3}>
+                                <FormControl fullWidth>
+                                    <InputLabel>Status Filter</InputLabel>
+                                    <Select
+                                        value={statusFilter}
+                                        label="Status Filter"
+                                        onChange={(e) => {
+                                            setStatusFilter(e.target.value);
+                                            setCurrentPage(1);
+                                        }}
+                                    >
+                                        <MenuItem value="all">All Statuses</MenuItem>
+                                        <MenuItem value="active">Active</MenuItem>
+                                        <MenuItem value="inactive">Inactive</MenuItem>
+                                        <MenuItem value="suspended">Suspended</MenuItem>
+                                        <MenuItem value="transferred">Transferred</MenuItem>
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                            <Grid item xs={12} md={3}>
+                                <FormControl fullWidth>
+                                    <InputLabel>Per Page</InputLabel>
+                                    <Select
+                                        value={pageSize}
+                                        label="Per Page"
+                                        onChange={(e) => {
+                                            setPageSize(e.target.value);
+                                            setCurrentPage(1);
+                                        }}
+                                    >
+                                        <MenuItem value={5}>5</MenuItem>
+                                        <MenuItem value={10}>10</MenuItem>
+                                        <MenuItem value={25}>25</MenuItem>
+                                        <MenuItem value={50}>50</MenuItem>
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                            <Grid item xs={12} md={2}>
+                                <Typography variant="body2" color="text.secondary" align="center">
+                                    {pagination.totalCount ? `Total: ${pagination.totalCount}` : ''}
+                                </Typography>
+                            </Grid>
+                        </Grid>
+                    </CardContent>
+                </Card>
 
-                {filteredMembers && filteredMembers.length > 0 ? (
+                {members && members.length > 0 ? (
                     <TableContainer component={Paper}>
                         <Table>
                             <TableHead>
@@ -236,7 +260,7 @@ const ChurchMembers = () => {
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {filteredMembers.map((member) => (
+                                {members.map((member) => (
                                     <TableRow key={member.id}>
                                         <TableCell>
                                             <Box>
@@ -339,6 +363,28 @@ const ChurchMembers = () => {
                             </Button>
                         </CardContent>
                     </Card>
+                )}
+
+                {/* Pagination */}
+                {pagination.totalPages > 1 && (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+                        <Stack spacing={2} alignItems="center">
+                            <Pagination
+                                count={pagination.totalPages}
+                                page={pagination.currentPage}
+                                onChange={(event, page) => setCurrentPage(page)}
+                                color="primary"
+                                size="large"
+                                showFirstButton
+                                showLastButton
+                            />
+                            <Typography variant="body2" color="text.secondary">
+                                Showing {((pagination.currentPage - 1) * pagination.limit) + 1} to{' '}
+                                {Math.min(pagination.currentPage * pagination.limit, pagination.totalCount)} of{' '}
+                                {pagination.totalCount} members
+                            </Typography>
+                        </Stack>
+                    </Box>
                 )}
 
                 {/* Delete Confirmation Dialog */}

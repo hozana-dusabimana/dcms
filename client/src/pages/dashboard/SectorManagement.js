@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
     Box,
     Container,
@@ -26,13 +26,21 @@ import {
     Switch,
     FormControlLabel,
     Grid,
+    Stack,
+    Pagination,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
+    InputAdornment,
 } from '@mui/material';
 import {
     Edit as EditIcon,
     Delete as DeleteIcon,
     Add as AddIcon,
     LocationOn as LocationIcon,
-    Business as BusinessIcon
+    Business as BusinessIcon,
+    Search as SearchIcon,
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { useAuth } from '../../contexts/AuthContext';
@@ -46,6 +54,10 @@ const SectorManagement = () => {
     const [editDialogOpen, setEditDialogOpen] = useState(false);
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
     const [selectedSector, setSelectedSector] = useState(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
     const [editForm, setEditForm] = useState({
         name: '',
         code: '',
@@ -67,21 +79,34 @@ const SectorManagement = () => {
         isActive: true
     });
 
-    // Fetch sectors
-    const { data: sectors, isLoading, error } = useQuery(
-        'sectors-all',
-        () => api.get('/sectors/all').then(res => res.data),
+    // Query parameters for pagination and filtering
+    const queryParams = useMemo(() => {
+        const params = new URLSearchParams();
+        params.append('page', currentPage.toString());
+        params.append('limit', pageSize.toString());
+        if (searchTerm) params.append('search', searchTerm);
+        if (statusFilter !== '') params.append('status', statusFilter);
+        return params.toString();
+    }, [currentPage, pageSize, searchTerm, statusFilter]);
+
+    // Fetch sectors with pagination
+    const { data: sectorsData, isLoading, error } = useQuery(
+        ['sectors-all', queryParams],
+        () => api.get(`/sectors/all?${queryParams}`).then(res => res.data),
         {
             enabled: user?.userType === 'civil_admin' || user?.userType === 'super_admin',
+            keepPreviousData: true,
         }
     );
+    const sectors = sectorsData?.sectors || [];
+    const pagination = sectorsData?.pagination || {};
 
     // Update sector mutation
     const updateSectorMutation = useMutation(
         ({ sectorId, sectorData }) => api.put(`/sectors/${sectorId}`, sectorData),
         {
             onSuccess: () => {
-                queryClient.invalidateQueries('sectors-all');
+                queryClient.invalidateQueries(['sectors-all']);
                 toast.success('Sector updated successfully');
                 setEditDialogOpen(false);
                 setSelectedSector(null);
@@ -97,7 +122,7 @@ const SectorManagement = () => {
         (sectorData) => api.post('/sectors', sectorData),
         {
             onSuccess: () => {
-                queryClient.invalidateQueries('sectors-all');
+                queryClient.invalidateQueries(['sectors-all']);
                 setCreateDialogOpen(false);
                 setCreateForm({
                     name: '',
@@ -122,7 +147,7 @@ const SectorManagement = () => {
         (sectorId) => api.delete(`/sectors/${sectorId}`),
         {
             onSuccess: () => {
-                queryClient.invalidateQueries('sectors-all');
+                queryClient.invalidateQueries(['sectors-all']);
                 toast.success('Sector deleted successfully');
             },
             onError: (error) => {
@@ -218,6 +243,72 @@ const SectorManagement = () => {
                     }
                 />
 
+                {/* Search and Filter Controls */}
+                <Card sx={{ mb: 3 }}>
+                    <CardContent>
+                        <Grid container spacing={2} alignItems="center">
+                            <Grid item xs={12} md={4}>
+                                <TextField
+                                    fullWidth
+                                    placeholder="Search by name, code, district, province..."
+                                    value={searchTerm}
+                                    onChange={(e) => {
+                                        setSearchTerm(e.target.value);
+                                        setCurrentPage(1);
+                                    }}
+                                    InputProps={{
+                                        startAdornment: (
+                                            <InputAdornment position="start">
+                                                <SearchIcon />
+                                            </InputAdornment>
+                                        ),
+                                    }}
+                                />
+                            </Grid>
+                            <Grid item xs={12} md={3}>
+                                <FormControl fullWidth>
+                                    <InputLabel>Status Filter</InputLabel>
+                                    <Select
+                                        value={statusFilter}
+                                        label="Status Filter"
+                                        onChange={(e) => {
+                                            setStatusFilter(e.target.value);
+                                            setCurrentPage(1);
+                                        }}
+                                    >
+                                        <MenuItem value="">All Statuses</MenuItem>
+                                        <MenuItem value="active">Active</MenuItem>
+                                        <MenuItem value="inactive">Inactive</MenuItem>
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                            <Grid item xs={12} md={3}>
+                                <FormControl fullWidth>
+                                    <InputLabel>Per Page</InputLabel>
+                                    <Select
+                                        value={pageSize}
+                                        label="Per Page"
+                                        onChange={(e) => {
+                                            setPageSize(e.target.value);
+                                            setCurrentPage(1);
+                                        }}
+                                    >
+                                        <MenuItem value={5}>5</MenuItem>
+                                        <MenuItem value={10}>10</MenuItem>
+                                        <MenuItem value={25}>25</MenuItem>
+                                        <MenuItem value={50}>50</MenuItem>
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                            <Grid item xs={12} md={2}>
+                                <Typography variant="body2" color="text.secondary" align="center">
+                                    {pagination.totalCount ? `Total: ${pagination.totalCount}` : ''}
+                                </Typography>
+                            </Grid>
+                        </Grid>
+                    </CardContent>
+                </Card>
+
                 {sectors && sectors.length > 0 ? (
                     <TableContainer component={Paper}>
                         <Table>
@@ -294,13 +385,40 @@ const SectorManagement = () => {
                                 No Sectors Found
                             </Typography>
                             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                                Get started by creating your first civil sector.
+                                {searchTerm || statusFilter !== '' 
+                                    ? 'No sectors match your search criteria. Try adjusting your filters.'
+                                    : 'Get started by creating your first civil sector.'
+                                }
                             </Typography>
-                            <Button variant="contained" onClick={handleCreateSector}>
-                                Add First Sector
-                            </Button>
+                            {!searchTerm && statusFilter === '' && (
+                                <Button variant="contained" onClick={handleCreateSector}>
+                                    Add First Sector
+                                </Button>
+                            )}
                         </CardContent>
                     </Card>
+                )}
+
+                {/* Pagination Controls */}
+                {pagination.totalPages > 1 && (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+                        <Stack spacing={2} alignItems="center">
+                            <Pagination
+                                count={pagination.totalPages}
+                                page={pagination.currentPage}
+                                onChange={(event, page) => setCurrentPage(page)}
+                                color="primary"
+                                size="large"
+                                showFirstButton
+                                showLastButton
+                            />
+                            <Typography variant="body2" color="text.secondary">
+                                Showing {((pagination.currentPage - 1) * pagination.limit) + 1} to{' '}
+                                {Math.min(pagination.currentPage * pagination.limit, pagination.totalCount)} of{' '}
+                                {pagination.totalCount} sectors
+                            </Typography>
+                        </Stack>
+                    </Box>
                 )}
 
                 {/* Edit Sector Dialog */}

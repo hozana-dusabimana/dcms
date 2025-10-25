@@ -2,13 +2,26 @@ const express = require('express');
 const router = express.Router();
 const { CertificateRequest, MarriageApplication, User } = require('../models');
 const { auth, authorize } = require('../middleware/auth-simple');
+const { Op } = require('sequelize');
 
 // @route   GET /api/certificate-requests
-// @desc    Get certificate requests based on user role
+// @desc    Get certificate requests based on user role with pagination
 // @access  Private
 router.get('/', auth, async (req, res) => {
     try {
-        let query = {};
+        const {
+            page = 1,
+            limit = 10,
+            search = '',
+            status = '',
+            paymentStatus = '',
+            certificateType = '',
+            sortBy = 'createdAt',
+            sortOrder = 'DESC'
+        } = req.query;
+        const offset = (parseInt(page) - 1) * parseInt(limit);
+
+        let whereClause = {};
         const user = await User.findByPk(req.userId);
 
         if (!user) {
@@ -17,13 +30,33 @@ router.get('/', auth, async (req, res) => {
 
         // Filter based on user role
         if (user.userType === 'couple') {
-            query.userId = req.userId;
+            whereClause.userId = req.userId;
         } else if (user.userType === 'civil_admin' || user.userType === 'super_admin') {
             // Admins can see all requests
         }
 
+        // Search functionality
+        if (search) {
+            whereClause[Op.or] = [
+                { requestNumber: { [Op.like]: `%${search}%` } },
+                { paymentReference: { [Op.like]: `%${search}%` } }
+            ];
+        }
+
+        // Status filters
+        if (status) {
+            whereClause.status = status;
+        }
+        if (paymentStatus) {
+            whereClause.paymentStatus = paymentStatus;
+        }
+        if (certificateType) {
+            whereClause.certificateType = certificateType;
+        }
+
+        const totalCount = await CertificateRequest.count({ where: whereClause });
         const certificateRequests = await CertificateRequest.findAll({
-            where: query,
+            where: whereClause,
             include: [
                 {
                     model: MarriageApplication,
@@ -31,10 +64,24 @@ router.get('/', auth, async (req, res) => {
                     attributes: ['id', 'applicationNumber', 'groomFirstName', 'groomLastName', 'brideFirstName', 'brideLastName', 'marriageDate']
                 }
             ],
-            order: [['createdAt', 'DESC']]
+            order: [[sortBy, sortOrder.toUpperCase()]],
+            limit: parseInt(limit),
+            offset: offset
         });
 
-        res.json({ certificateRequests });
+        const totalPages = Math.ceil(totalCount / parseInt(limit));
+
+        res.json({
+            certificateRequests,
+            pagination: {
+                currentPage: parseInt(page),
+                totalPages,
+                totalCount,
+                hasNextPage: parseInt(page) < totalPages,
+                hasPrevPage: parseInt(page) > 1,
+                limit: parseInt(limit)
+            }
+        });
     } catch (error) {
         console.error('Get certificate requests error:', error);
         res.status(500).json({ message: 'Server error' });

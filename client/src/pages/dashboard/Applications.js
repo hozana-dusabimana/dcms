@@ -25,6 +25,8 @@ import {
     Select,
     MenuItem,
     Grid,
+    Pagination,
+    Stack,
 } from '@mui/material';
 import {
     Visibility as ViewIcon,
@@ -48,24 +50,38 @@ const Applications = () => {
     // Search and filter state
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
 
-    // Fetch applications based on user role
+    // Build query parameters
+    const queryParams = useMemo(() => {
+        const params = new URLSearchParams();
+        params.append('page', currentPage.toString());
+        params.append('limit', pageSize.toString());
+        if (searchTerm) params.append('search', searchTerm);
+        if (statusFilter !== 'all') params.append('status', statusFilter);
+        return params.toString();
+    }, [currentPage, pageSize, searchTerm, statusFilter]);
+
+    // Fetch applications with pagination and filtering
     const { data: applicationsData, isLoading, error } = useQuery(
-        'applications',
-        () => api.get('/applications').then(res => res.data),
+        ['applications', queryParams],
+        () => api.get(`/applications?${queryParams}`).then(res => res.data),
         {
             enabled: !!user,
+            keepPreviousData: true,
         }
     );
 
     const applications = applicationsData?.applications || [];
+    const pagination = applicationsData?.pagination || {};
 
     // Sector approve application mutation (Civil Admin)
     const sectorApproveMutation = useMutation(
         (applicationId) => api.put(`/applications/${applicationId}/sector-approve`),
         {
             onSuccess: () => {
-                queryClient.invalidateQueries('applications');
+                queryClient.invalidateQueries(['applications']);
                 toast.success('Application approved at sector level');
             },
             onError: (error) => {
@@ -79,7 +95,7 @@ const Applications = () => {
         ({ applicationId, reason }) => api.put(`/applications/${applicationId}/sector-reject`, { reason }),
         {
             onSuccess: () => {
-                queryClient.invalidateQueries('applications');
+                queryClient.invalidateQueries(['applications']);
                 toast.success('Application rejected at sector level');
             },
             onError: (error) => {
@@ -93,7 +109,7 @@ const Applications = () => {
         (applicationId) => api.put(`/applications/${applicationId}/church-approve`),
         {
             onSuccess: () => {
-                queryClient.invalidateQueries('applications');
+                queryClient.invalidateQueries(['applications']);
                 toast.success('Application approved at church level');
             },
             onError: (error) => {
@@ -107,7 +123,7 @@ const Applications = () => {
         ({ applicationId, reason }) => api.put(`/applications/${applicationId}/church-reject`, { reason }),
         {
             onSuccess: () => {
-                queryClient.invalidateQueries('applications');
+                queryClient.invalidateQueries(['applications']);
                 toast.success('Application rejected at church level');
             },
             onError: (error) => {
@@ -130,19 +146,7 @@ const Applications = () => {
 
     const canReview = user?.userType === 'church_leader' || user?.userType === 'civil_admin';
 
-    // Filter applications based on search term and status
-    const filteredApplications = useMemo(() => {
-        return applications.filter(application => {
-            const matchesSearch = searchTerm === '' ||
-                application.applicationNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                `${application.groomFirstName} ${application.groomLastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                `${application.brideFirstName} ${application.brideLastName}`.toLowerCase().includes(searchTerm.toLowerCase());
-
-            const matchesStatus = statusFilter === 'all' || application.status === statusFilter;
-
-            return matchesSearch && matchesStatus;
-        });
-    }, [applications, searchTerm, statusFilter]);
+    // Server-side filtering is now handled by the API
 
     const handleViewApplication = (applicationId) => {
         navigate(`/dashboard/applications/${applicationId}`);
@@ -222,55 +226,76 @@ const Applications = () => {
                 />
 
                 {/* Search and Filter Section */}
-                {applications && applications.length > 0 && (
-                    <Card sx={{ mb: 3 }}>
-                        <CardContent>
-                            <Grid container spacing={2} alignItems="center">
-                                <Grid item xs={12} md={6}>
-                                    <TextField
-                                        fullWidth
-                                        placeholder="Search by application number or couple names..."
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                        InputProps={{
-                                            startAdornment: (
-                                                <InputAdornment position="start">
-                                                    <SearchIcon />
-                                                </InputAdornment>
-                                            ),
-                                        }}
-                                        size="small"
-                                    />
-                                </Grid>
-                                <Grid item xs={12} md={3}>
-                                    <FormControl fullWidth size="small">
-                                        <InputLabel>Status Filter</InputLabel>
-                                        <Select
-                                            value={statusFilter}
-                                            label="Status Filter"
-                                            onChange={(e) => setStatusFilter(e.target.value)}
-                                        >
-                                            <MenuItem value="all">All Statuses</MenuItem>
-                                            <MenuItem value="pending">Pending</MenuItem>
-                                            <MenuItem value="under_review">Under Review</MenuItem>
-                                            <MenuItem value="sector_approved">Sector Approved</MenuItem>
-                                            <MenuItem value="approved">Approved</MenuItem>
-                                            <MenuItem value="rejected">Rejected</MenuItem>
-                                            <MenuItem value="completed">Completed</MenuItem>
-                                        </Select>
-                                    </FormControl>
-                                </Grid>
-                                <Grid item xs={12} md={3}>
-                                    <Typography variant="body2" color="text.secondary">
-                                        Showing {filteredApplications.length} of {applications.length} applications
-                                    </Typography>
-                                </Grid>
+                <Card sx={{ mb: 3 }}>
+                    <CardContent>
+                        <Grid container spacing={2} alignItems="center">
+                            <Grid item xs={12} md={4}>
+                                <TextField
+                                    fullWidth
+                                    placeholder="Search by application number or couple names..."
+                                    value={searchTerm}
+                                    onChange={(e) => {
+                                        setSearchTerm(e.target.value);
+                                        setCurrentPage(1); // Reset to first page when searching
+                                    }}
+                                    InputProps={{
+                                        startAdornment: (
+                                            <InputAdornment position="start">
+                                                <SearchIcon />
+                                            </InputAdornment>
+                                        ),
+                                    }}
+                                />
                             </Grid>
-                        </CardContent>
-                    </Card>
-                )}
+                            <Grid item xs={12} md={3}>
+                                <FormControl fullWidth>
+                                    <InputLabel>Status Filter</InputLabel>
+                                    <Select
+                                        value={statusFilter}
+                                        label="Status Filter"
+                                        onChange={(e) => {
+                                            setStatusFilter(e.target.value);
+                                            setCurrentPage(1);
+                                        }}
+                                    >
+                                        <MenuItem value="all">All Statuses</MenuItem>
+                                        <MenuItem value="pending">Pending</MenuItem>
+                                        <MenuItem value="under_review">Under Review</MenuItem>
+                                        <MenuItem value="sector_approved">Sector Approved</MenuItem>
+                                        <MenuItem value="approved">Approved</MenuItem>
+                                        <MenuItem value="rejected">Rejected</MenuItem>
+                                        <MenuItem value="completed">Completed</MenuItem>
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                            <Grid item xs={12} md={3}>
+                                <FormControl fullWidth>
+                                    <InputLabel>Per Page</InputLabel>
+                                    <Select
+                                        value={pageSize}
+                                        label="Per Page"
+                                        onChange={(e) => {
+                                            setPageSize(e.target.value);
+                                            setCurrentPage(1);
+                                        }}
+                                    >
+                                        <MenuItem value={5}>5</MenuItem>
+                                        <MenuItem value={10}>10</MenuItem>
+                                        <MenuItem value={25}>25</MenuItem>
+                                        <MenuItem value={50}>50</MenuItem>
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                            <Grid item xs={12} md={2}>
+                                <Typography variant="body2" color="text.secondary" align="center">
+                                    {pagination.totalCount ? `Total: ${pagination.totalCount}` : ''}
+                                </Typography>
+                            </Grid>
+                        </Grid>
+                    </CardContent>
+                </Card>
 
-                {filteredApplications && filteredApplications.length > 0 ? (
+                {applications && applications.length > 0 ? (
                     <TableContainer component={Paper}>
                         <Table>
                             <TableHead>
@@ -284,7 +309,7 @@ const Applications = () => {
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {filteredApplications.map((application) => (
+                                {applications.map((application) => (
                                     <TableRow key={application.id}>
                                         <TableCell>{application.applicationNumber}</TableCell>
                                         <TableCell>
@@ -383,6 +408,28 @@ const Applications = () => {
                             )}
                         </CardContent>
                     </Card>
+                )}
+
+                {/* Pagination */}
+                {pagination.totalPages > 1 && (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+                        <Stack spacing={2} alignItems="center">
+                            <Pagination
+                                count={pagination.totalPages}
+                                page={pagination.currentPage}
+                                onChange={(event, page) => setCurrentPage(page)}
+                                color="primary"
+                                size="large"
+                                showFirstButton
+                                showLastButton
+                            />
+                            <Typography variant="body2" color="text.secondary">
+                                Showing {((pagination.currentPage - 1) * pagination.limit) + 1} to{' '}
+                                {Math.min(pagination.currentPage * pagination.limit, pagination.totalCount)} of{' '}
+                                {pagination.totalCount} applications
+                            </Typography>
+                        </Stack>
+                    </Box>
                 )}
             </Container>
         </Box>

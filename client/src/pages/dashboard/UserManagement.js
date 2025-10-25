@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
     Box,
     Container,
@@ -30,6 +30,9 @@ import {
     Switch,
     FormControlLabel,
     Grid,
+    InputAdornment,
+    Pagination,
+    Stack,
 } from '@mui/material';
 import {
     Edit as EditIcon,
@@ -37,6 +40,8 @@ import {
     PersonAdd as AddUserIcon,
     Block as BlockIcon,
     CheckCircle as ActivateIcon,
+    Search as SearchIcon,
+    FilterList as FilterIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
@@ -50,6 +55,13 @@ const UserManagement = () => {
     const [editDialogOpen, setEditDialogOpen] = useState(false);
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
     const [selectedUser, setSelectedUser] = useState(null);
+
+    // Search and filter state
+    const [searchTerm, setSearchTerm] = useState('');
+    const [userTypeFilter, setUserTypeFilter] = useState('');
+    const [statusFilter, setStatusFilter] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
     const [editForm, setEditForm] = useState({
         firstName: '',
         lastName: '',
@@ -68,21 +80,36 @@ const UserManagement = () => {
         isActive: true
     });
 
-    // Fetch users
-    const { data: users, isLoading, error } = useQuery(
-        'users',
-        () => api.get('/users').then(res => res.data),
+    // Build query parameters
+    const queryParams = useMemo(() => {
+        const params = new URLSearchParams();
+        params.append('page', currentPage.toString());
+        params.append('limit', pageSize.toString());
+        if (searchTerm) params.append('search', searchTerm);
+        if (userTypeFilter) params.append('userType', userTypeFilter);
+        if (statusFilter !== '') params.append('isActive', statusFilter);
+        return params.toString();
+    }, [currentPage, pageSize, searchTerm, userTypeFilter, statusFilter]);
+
+    // Fetch users with pagination and filtering
+    const { data: usersData, isLoading, error } = useQuery(
+        ['users', queryParams],
+        () => api.get(`/users?${queryParams}`).then(res => res.data),
         {
             enabled: user?.userType === 'civil_admin' || user?.userType === 'super_admin',
+            keepPreviousData: true, // Keep previous data while loading new data
         }
     );
+
+    const users = usersData?.users || [];
+    const pagination = usersData?.pagination || {};
 
     // Update user mutation
     const updateUserMutation = useMutation(
         ({ userId, userData }) => api.put(`/users/${userId}`, userData),
         {
             onSuccess: () => {
-                queryClient.invalidateQueries('users');
+                queryClient.invalidateQueries(['users']);
                 toast.success('User updated successfully');
                 setEditDialogOpen(false);
                 setSelectedUser(null);
@@ -98,7 +125,7 @@ const UserManagement = () => {
         (userData) => api.post('/auth/register', userData),
         {
             onSuccess: () => {
-                queryClient.invalidateQueries('users');
+                queryClient.invalidateQueries(['users']);
                 setCreateDialogOpen(false);
                 setCreateForm({
                     firstName: '',
@@ -123,7 +150,7 @@ const UserManagement = () => {
         (userId) => api.delete(`/users/${userId}`),
         {
             onSuccess: () => {
-                queryClient.invalidateQueries('users');
+                queryClient.invalidateQueries(['users']);
                 toast.success('User deleted successfully');
             },
             onError: (error) => {
@@ -137,7 +164,7 @@ const UserManagement = () => {
         ({ userId, isActive }) => api.put(`/users/${userId}/status`, { isActive }),
         {
             onSuccess: () => {
-                queryClient.invalidateQueries('users');
+                queryClient.invalidateQueries(['users']);
                 toast.success('User status updated successfully');
             },
             onError: (error) => {
@@ -247,6 +274,86 @@ const UserManagement = () => {
                     }
                 />
 
+                {/* Search and Filter Section */}
+                <Card sx={{ mb: 3 }}>
+                    <CardContent>
+                        <Grid container spacing={2} alignItems="center">
+                            <Grid item xs={12} md={4}>
+                                <TextField
+                                    fullWidth
+                                    placeholder="Search users..."
+                                    value={searchTerm}
+                                    onChange={(e) => {
+                                        setSearchTerm(e.target.value);
+                                        setCurrentPage(1); // Reset to first page when searching
+                                    }}
+                                    InputProps={{
+                                        startAdornment: (
+                                            <InputAdornment position="start">
+                                                <SearchIcon />
+                                            </InputAdornment>
+                                        ),
+                                    }}
+                                />
+                            </Grid>
+                            <Grid item xs={12} md={3}>
+                                <FormControl fullWidth>
+                                    <InputLabel>User Type</InputLabel>
+                                    <Select
+                                        value={userTypeFilter}
+                                        label="User Type"
+                                        onChange={(e) => {
+                                            setUserTypeFilter(e.target.value);
+                                            setCurrentPage(1);
+                                        }}
+                                    >
+                                        <MenuItem value="">All Types</MenuItem>
+                                        <MenuItem value="couple">Couple</MenuItem>
+                                        <MenuItem value="church_leader">Church Leader</MenuItem>
+                                        <MenuItem value="civil_admin">Civil Admin</MenuItem>
+                                        <MenuItem value="super_admin">Super Admin</MenuItem>
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                            <Grid item xs={12} md={3}>
+                                <FormControl fullWidth>
+                                    <InputLabel>Status</InputLabel>
+                                    <Select
+                                        value={statusFilter}
+                                        label="Status"
+                                        onChange={(e) => {
+                                            setStatusFilter(e.target.value);
+                                            setCurrentPage(1);
+                                        }}
+                                    >
+                                        <MenuItem value="">All Status</MenuItem>
+                                        <MenuItem value="true">Active</MenuItem>
+                                        <MenuItem value="false">Inactive</MenuItem>
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                            <Grid item xs={12} md={2}>
+                                <FormControl fullWidth>
+                                    <InputLabel>Per Page</InputLabel>
+                                    <Select
+                                        value={pageSize}
+                                        label="Per Page"
+                                        onChange={(e) => {
+                                            setPageSize(e.target.value);
+                                            setCurrentPage(1);
+                                        }}
+                                    >
+                                        <MenuItem value={5}>5</MenuItem>
+                                        <MenuItem value={10}>10</MenuItem>
+                                        <MenuItem value={25}>25</MenuItem>
+                                        <MenuItem value={50}>50</MenuItem>
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                        </Grid>
+                    </CardContent>
+                </Card>
+
                 {users && users.length > 0 ? (
                     <TableContainer component={Paper}>
                         <Table>
@@ -326,13 +433,41 @@ const UserManagement = () => {
                     <Card>
                         <CardContent sx={{ textAlign: 'center', py: 6 }}>
                             <Typography variant="h6" gutterBottom>
-                                No Users Found
+                                {searchTerm || userTypeFilter || statusFilter !== ''
+                                    ? 'No Users Match Your Search'
+                                    : 'No Users Found'
+                                }
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
-                                There are no users to display.
+                                {searchTerm || userTypeFilter || statusFilter !== ''
+                                    ? 'Try adjusting your search criteria or filters.'
+                                    : 'There are no users to display.'
+                                }
                             </Typography>
                         </CardContent>
                     </Card>
+                )}
+
+                {/* Pagination */}
+                {pagination.totalPages > 1 && (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+                        <Stack spacing={2} alignItems="center">
+                            <Pagination
+                                count={pagination.totalPages}
+                                page={pagination.currentPage}
+                                onChange={(event, page) => setCurrentPage(page)}
+                                color="primary"
+                                size="large"
+                                showFirstButton
+                                showLastButton
+                            />
+                            <Typography variant="body2" color="text.secondary">
+                                Showing {((pagination.currentPage - 1) * pagination.limit) + 1} to{' '}
+                                {Math.min(pagination.currentPage * pagination.limit, pagination.totalCount)} of{' '}
+                                {pagination.totalCount} users
+                            </Typography>
+                        </Stack>
+                    </Box>
                 )}
 
                 {/* Edit User Dialog */}

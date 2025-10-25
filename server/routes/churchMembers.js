@@ -1,13 +1,27 @@
 const express = require('express');
 const router = express.Router();
+const { Op } = require('sequelize');
 const { ChurchMember, User, Church } = require('../models');
 const { auth, authorize } = require('../middleware/auth-simple');
 
 // @route   GET /api/church-members
-// @desc    Get church members
+// @desc    Get church members with pagination, filtering, and search
 // @access  Private
 router.get('/', auth, async (req, res) => {
     try {
+        // Extract query parameters
+        const {
+            page = 1,
+            limit = 10,
+            search = '',
+            status = '',
+            sortBy = 'lastName',
+            sortOrder = 'ASC'
+        } = req.query;
+
+        // Calculate offset for pagination
+        const offset = (parseInt(page) - 1) * parseInt(limit);
+
         const user = await User.findByPk(req.userId);
 
         let whereClause = {};
@@ -17,6 +31,25 @@ router.get('/', auth, async (req, res) => {
             whereClause.churchId = user.churchId;
         }
 
+        // Add search functionality
+        if (search) {
+            whereClause[Op.or] = [
+                { firstName: { [Op.like]: `%${search}%` } },
+                { lastName: { [Op.like]: `%${search}%` } },
+                { email: { [Op.like]: `%${search}%` } },
+                { membershipNumber: { [Op.like]: `%${search}%` } }
+            ];
+        }
+
+        // Add status filter if provided
+        if (status) {
+            whereClause.membershipStatus = status;
+        }
+
+        // Get total count for pagination
+        const totalCount = await ChurchMember.count({ where: whereClause });
+
+        // Get members with pagination and filtering
         const members = await ChurchMember.findAll({
             where: whereClause,
             include: [
@@ -31,10 +64,27 @@ router.get('/', auth, async (req, res) => {
                     attributes: ['id', 'firstName', 'lastName']
                 }
             ],
-            order: [['lastName', 'ASC'], ['firstName', 'ASC']]
+            order: [[sortBy, sortOrder.toUpperCase()]],
+            limit: parseInt(limit),
+            offset: offset
         });
 
-        res.json({ members });
+        // Calculate pagination info
+        const totalPages = Math.ceil(totalCount / parseInt(limit));
+        const hasNextPage = parseInt(page) < totalPages;
+        const hasPrevPage = parseInt(page) > 1;
+
+        res.json({
+            members,
+            pagination: {
+                currentPage: parseInt(page),
+                totalPages,
+                totalCount,
+                hasNextPage,
+                hasPrevPage,
+                limit: parseInt(limit)
+            }
+        });
     } catch (error) {
         console.error('Get church members error:', error);
         res.status(500).json({ message: 'Server error' });

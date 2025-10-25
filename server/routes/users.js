@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { Op } = require('sequelize');
 const User = require('../models/User');
 const Church = require('../models/Church');
 const Sector = require('../models/Sector');
@@ -20,18 +21,79 @@ router.get('/test', async (req, res) => {
 });
 
 // @route   GET /api/users
-// @desc    Get all users (admin only)
+// @desc    Get all users with pagination, filtering, and search (admin only)
 // @access  Private
 router.get('/', auth, authorize('civil_admin', 'super_admin'), async (req, res) => {
     try {
         console.log('Users route called, req.user:', req.user);
+
+        // Extract query parameters
+        const {
+            page = 1,
+            limit = 10,
+            search = '',
+            userType = '',
+            isActive = '',
+            sortBy = 'createdAt',
+            sortOrder = 'DESC'
+        } = req.query;
+
+        // Calculate offset for pagination
+        const offset = (parseInt(page) - 1) * parseInt(limit);
+
+        // Build where clause for filtering
+        const whereClause = {};
+
+        // Search functionality
+        if (search) {
+            whereClause[Op.or] = [
+                { firstName: { [Op.like]: `%${search}%` } },
+                { lastName: { [Op.like]: `%${search}%` } },
+                { email: { [Op.like]: `%${search}%` } },
+                { username: { [Op.like]: `%${search}%` } }
+            ];
+        }
+
+        // Filter by user type
+        if (userType) {
+            whereClause.userType = userType;
+        }
+
+        // Filter by active status
+        if (isActive !== '') {
+            whereClause.isActive = isActive === 'true';
+        }
+
+        // Get total count for pagination
+        const totalCount = await User.count({ where: whereClause });
+
+        // Get users with pagination and filtering
         const users = await User.findAll({
+            where: whereClause,
             attributes: { exclude: ['password'] },
-            order: [['createdAt', 'DESC']]
+            order: [[sortBy, sortOrder.toUpperCase()]],
+            limit: parseInt(limit),
+            offset: offset
         });
 
-        console.log('Users found:', users.length);
-        res.json(users);
+        // Calculate pagination info
+        const totalPages = Math.ceil(totalCount / parseInt(limit));
+        const hasNextPage = parseInt(page) < totalPages;
+        const hasPrevPage = parseInt(page) > 1;
+
+        console.log('Users found:', users.length, 'Total:', totalCount);
+
+        res.json({
+            users,
+            pagination: {
+                currentPage: parseInt(page),
+                totalPages,
+                totalCount,
+                hasNextPage,
+                hasPrevPage,
+                limit: parseInt(limit)
+            }
+        });
     } catch (error) {
         console.error('Get users error:', error);
         res.status(500).json({ message: 'Server error', error: error.message });
