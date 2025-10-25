@@ -52,3 +52,4 @@ const ServiceComment = sequelize.define('ServiceComment', {
 });
 
 module.exports = ServiceComment;
+

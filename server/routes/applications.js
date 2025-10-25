@@ -33,9 +33,9 @@ router.get('/', auth, async (req, res) => {
             // Church leaders can only see applications that are sector-approved
             query.status = 'sector_approved';
         } else if (user.userType === 'civil_admin') {
-            // Civil admins can see applications in their sector that are pending or under review
+            // Civil admins can see all applications in their sector for tracking and management
             query.sectorId = user.sectorId;
-            query.status = ['pending', 'under_review'];
+            // Remove status filter to show all applications including approved ones
         }
 
         const applications = await MarriageApplication.findAll({

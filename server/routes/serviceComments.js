@@ -220,3 +220,4 @@ router.delete('/:id', authenticateMember, async (req, res) => {
 });
 
 module.exports = router;
+

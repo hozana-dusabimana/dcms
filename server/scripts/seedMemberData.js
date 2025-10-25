@@ -78,3 +78,4 @@ const seedMemberData = async () => {
 
 // Run the script
 seedMemberData();
+

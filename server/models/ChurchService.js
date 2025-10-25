@@ -97,3 +97,4 @@ const ChurchService = sequelize.define('ChurchService', {
 });
 
 module.exports = ChurchService;
+

@@ -23,3 +23,4 @@ const MemberProtectedRoute = ({ children }) => {
 };
 
 export default MemberProtectedRoute;
+
