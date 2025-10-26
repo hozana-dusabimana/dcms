@@ -32,7 +32,7 @@ const CertificateRequest = sequelize.define('CertificateRequest', {
         field: 'request_number'
     },
     certificateType: {
-        type: DataTypes.ENUM('sector', 'church'),
+        type: DataTypes.ENUM('sector', 'church', 'civil', 'religious'),
         allowNull: false,
         defaultValue: 'sector',
         field: 'certificate_type'
@@ -57,6 +57,16 @@ const CertificateRequest = sequelize.define('CertificateRequest', {
         type: DataTypes.DATE,
         allowNull: true,
         field: 'payment_date'
+    },
+    paymentMethod: {
+        type: DataTypes.STRING(50),
+        allowNull: true,
+        field: 'payment_method'
+    },
+    transactionId: {
+        type: DataTypes.STRING(100),
+        allowNull: true,
+        field: 'transaction_id'
     },
     approvedAt: {
         type: DataTypes.DATE,

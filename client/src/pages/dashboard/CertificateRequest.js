@@ -8,7 +8,6 @@ import {
     CardContent,
     Button,
     Chip,
-    Grid,
     Alert,
     CircularProgress,
     Table,
@@ -17,7 +16,6 @@ import {
     TableContainer,
     TableHead,
     TableRow,
-    Paper,
     IconButton,
     Tooltip,
     Dialog,
@@ -52,11 +50,11 @@ const CertificateRequest = () => {
     const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
     const [selectedApplication, setSelectedApplication] = useState(null);
     const [selectedCertificateType, setSelectedCertificateType] = useState('sector');
-    const [paymentReference, setPaymentReference] = useState('');
+    const [phoneNumber, setPhoneNumber] = useState('');
 
-    // Fetch approved applications for certificate requests
+    // Fetch applications for certificate requests
     const { data: applicationsData, isLoading: applicationsLoading } = useQuery(
-        'approved-applications',
+        'applications-for-certificates',
         () => api.get('/applications').then(res => res.data),
         {
             enabled: !!user && user.userType === 'couple',
@@ -72,7 +70,10 @@ const CertificateRequest = () => {
         }
     );
 
-    const applications = applicationsData?.applications?.filter(app => app.status === 'approved') || [];
+    // Filter applications based on their status for certificate eligibility
+    const applications = applicationsData?.applications?.filter(app =>
+        ['sector_approved', 'approved', 'civil_completed', 'completed'].includes(app.status)
+    ) || [];
     const certificateRequests = certificateRequestsData?.certificateRequests || [];
 
     // Create certificate request mutation
@@ -91,18 +92,35 @@ const CertificateRequest = () => {
         }
     );
 
-    // Pay certificate request mutation
+    // Pay certificate request mutation using ITEC Pay
     const payRequestMutation = useMutation(
-        ({ requestId, paymentRef }) => api.put(`/certificate-requests/${requestId}/pay`, { paymentReference: paymentRef }),
+        ({ requestId, phone, amount }) => api.put(`/certificate-requests/${requestId}/pay`, { phone, amount }),
         {
-            onSuccess: () => {
+            onSuccess: (response, variables) => {
                 queryClient.invalidateQueries('certificate-requests');
-                setPaymentDialogOpen(false);
-                setPaymentReference('');
-                toast.success('Payment recorded successfully');
+
+                if (response.data.success) {
+                    if (response.data.isProcessing) {
+                        // Payment is processing, show processing message and start polling
+                        toast.info('Payment initiated! Please confirm on your phone. Checking status...');
+                        setPaymentDialogOpen(false);
+                        setPhoneNumber('');
+
+                        // Start polling for payment status
+                        startPaymentStatusPolling(variables.requestId);
+                    } else {
+                        // Payment completed immediately
+                        setPaymentDialogOpen(false);
+                        setPhoneNumber('');
+                        toast.success('Payment processed successfully!');
+                    }
+                } else {
+                    toast.error('Payment failed. Please try again.');
+                }
             },
             onError: (error) => {
-                toast.error(error.response?.data?.message || 'Failed to record payment');
+                console.error('Payment error:', error);
+                toast.error(error.response?.data?.message || 'Payment processing failed');
             },
         }
     );
@@ -142,6 +160,7 @@ const CertificateRequest = () => {
     const getPaymentStatusColor = (status) => {
         switch (status) {
             case 'pending': return 'warning';
+            case 'processing': return 'info';
             case 'paid': return 'success';
             case 'failed': return 'error';
             case 'refunded': return 'info';
@@ -149,8 +168,65 @@ const CertificateRequest = () => {
         }
     };
 
-    const handleRequestCertificate = (application) => {
+    // Payment status polling function
+    const startPaymentStatusPolling = (requestId) => {
+        const pollInterval = setInterval(async () => {
+            try {
+                const response = await api.put(`/certificate-requests/${requestId}/check-payment`);
+
+                if (response.data.success) {
+                    if (!response.data.isProcessing) {
+                        // Payment completed or failed, stop polling
+                        clearInterval(pollInterval);
+                        queryClient.invalidateQueries('certificate-requests');
+
+                        if (response.data.certificateRequest.paymentStatus === 'paid') {
+                            toast.success('Payment confirmed successfully!');
+                        } else if (response.data.certificateRequest.paymentStatus === 'failed') {
+                            toast.error('Payment failed. Please try again.');
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking payment status:', error);
+                // Continue polling on error
+            }
+        }, 3000); // Check every 3 seconds
+
+        // Stop polling after 5 minutes
+        setTimeout(() => {
+            clearInterval(pollInterval);
+        }, 300000);
+    };
+
+    // Get available certificate types based on application status
+    const getAvailableCertificateTypes = (application) => {
+        const types = [];
+
+        if (['sector_approved', 'approved', 'civil_completed', 'completed'].includes(application.status)) {
+            types.push({ value: 'sector', label: 'Sector Certificate (Civil)' });
+        }
+
+        if (['approved', 'completed'].includes(application.status)) {
+            types.push({ value: 'church', label: 'Church Certificate (Religious)' });
+        }
+
+        if (application.status === 'civil_completed') {
+            types.push({ value: 'civil', label: 'Civil Marriage Certificate' });
+        }
+
+        if (application.status === 'completed') {
+            types.push({ value: 'religious', label: 'Religious Marriage Certificate' });
+        }
+
+        return types;
+    };
+
+    const handleRequestCertificate = (application, certificateType = null) => {
         setSelectedApplication(application);
+        if (certificateType) {
+            setSelectedCertificateType(certificateType);
+        }
         setRequestDialogOpen(true);
     };
 
@@ -173,10 +249,11 @@ const CertificateRequest = () => {
     };
 
     const confirmPayment = () => {
-        if (selectedApplication && paymentReference.trim()) {
+        if (selectedApplication && phoneNumber.trim()) {
             payRequestMutation.mutate({
                 requestId: selectedApplication.id,
-                paymentRef: paymentReference.trim()
+                phone: phoneNumber.trim(),
+                amount: 100 // 100 RWF for certificate
             });
         }
     };
@@ -206,7 +283,7 @@ const CertificateRequest = () => {
                         <Card sx={{ mb: 4 }}>
                             <CardContent>
                                 <Typography variant="h6" gutterBottom>
-                                    Approved Applications - Ready for Certificate Request
+                                    Marriage Applications - Ready for Certificate Request
                                 </Typography>
                                 {applications.length > 0 ? (
                                     <TableContainer>
@@ -216,14 +293,23 @@ const CertificateRequest = () => {
                                                     <TableCell>Application Number</TableCell>
                                                     <TableCell>Couple Names</TableCell>
                                                     <TableCell>Wedding Date</TableCell>
+                                                    <TableCell>Marriage Status</TableCell>
+                                                    <TableCell>Available Certificates</TableCell>
                                                     <TableCell>Actions</TableCell>
                                                 </TableRow>
                                             </TableHead>
                                             <TableBody>
                                                 {applications.map((application) => {
-                                                    const hasRequest = certificateRequests.some(
-                                                        req => req.applicationId === application.id
-                                                    );
+                                                    const availableTypes = getAvailableCertificateTypes(application);
+                                                    const getStatusColor = (status) => {
+                                                        switch (status) {
+                                                            case 'sector_approved': return 'primary';
+                                                            case 'approved': return 'success';
+                                                            case 'civil_completed': return 'info';
+                                                            case 'completed': return 'success';
+                                                            default: return 'default';
+                                                        }
+                                                    };
 
                                                     return (
                                                         <TableRow key={application.id}>
@@ -235,18 +321,57 @@ const CertificateRequest = () => {
                                                                 {new Date(application.marriageDate).toLocaleDateString()}
                                                             </TableCell>
                                                             <TableCell>
-                                                                {hasRequest ? (
-                                                                    <Chip label="Request Already Made" color="info" size="small" />
-                                                                ) : (
-                                                                    <Button
-                                                                        variant="contained"
-                                                                        startIcon={<RequestIcon />}
-                                                                        onClick={() => handleRequestCertificate(application)}
-                                                                        size="small"
-                                                                    >
-                                                                        Request Certificate
-                                                                    </Button>
-                                                                )}
+                                                                <Chip
+                                                                    label={application.status.replace('_', ' ').toUpperCase()}
+                                                                    color={getStatusColor(application.status)}
+                                                                    size="small"
+                                                                />
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                                                    {availableTypes.map((type) => (
+                                                                        <Chip
+                                                                            key={type.value}
+                                                                            label={type.label.split(' ')[0]}
+                                                                            color="secondary"
+                                                                            size="small"
+                                                                            variant="outlined"
+                                                                        />
+                                                                    ))}
+                                                                </Box>
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                                                    {availableTypes.map((type) => {
+                                                                        const hasRequestForType = certificateRequests.some(
+                                                                            req => req.applicationId === application.id && req.certificateType === type.value
+                                                                        );
+
+                                                                        return (
+                                                                            <Box key={type.value} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                                                <Chip
+                                                                                    label={type.label}
+                                                                                    color="secondary"
+                                                                                    size="small"
+                                                                                    variant="outlined"
+                                                                                />
+                                                                                {hasRequestForType ? (
+                                                                                    <Chip label="Requested" color="success" size="small" />
+                                                                                ) : (
+                                                                                    <Button
+                                                                                        variant="outlined"
+                                                                                        startIcon={<RequestIcon />}
+                                                                                        onClick={() => handleRequestCertificate(application, type.value)}
+                                                                                        size="small"
+                                                                                        sx={{ minWidth: 'auto', px: 1 }}
+                                                                                    >
+                                                                                        Request
+                                                                                    </Button>
+                                                                                )}
+                                                                            </Box>
+                                                                        );
+                                                                    })}
+                                                                </Box>
                                                             </TableCell>
                                                         </TableRow>
                                                     );
@@ -256,7 +381,7 @@ const CertificateRequest = () => {
                                     </TableContainer>
                                 ) : (
                                     <Alert severity="info">
-                                        No approved applications available for certificate requests.
+                                        No marriage applications available for certificate requests.
                                     </Alert>
                                 )}
                             </CardContent>
@@ -328,8 +453,8 @@ const CertificateRequest = () => {
                                                             <RequestIcon />
                                                         </IconButton>
                                                     </Tooltip>
-                                                    {request.paymentStatus === 'pending' && user?.userType === 'couple' && (
-                                                        <Tooltip title="Record Payment">
+                                                    {request.paymentStatus === 'pending' && (user?.userType === 'couple' || user?.userType === 'church_leader' || user?.userType === 'civil_admin') && (
+                                                        <Tooltip title="Pay with ITEC Pay">
                                                             <IconButton
                                                                 onClick={() => handlePayCertificate(request)}
                                                                 color="primary"
@@ -338,24 +463,50 @@ const CertificateRequest = () => {
                                                             </IconButton>
                                                         </Tooltip>
                                                     )}
+                                                    {request.paymentStatus === 'processing' && (user?.userType === 'couple' || user?.userType === 'church_leader' || user?.userType === 'civil_admin') && (
+                                                        <Tooltip title="Payment Processing - Please confirm on your phone">
+                                                            <span>
+                                                                <IconButton
+                                                                    color="info"
+                                                                    disabled
+                                                                >
+                                                                    <PaymentIcon />
+                                                                </IconButton>
+                                                            </span>
+                                                        </Tooltip>
+                                                    )}
+                                                    {request.paymentStatus === 'failed' && (user?.userType === 'couple' || user?.userType === 'church_leader' || user?.userType === 'civil_admin') && (
+                                                        <Tooltip title="Try Payment Again">
+                                                            <IconButton
+                                                                onClick={() => handlePayCertificate(request)}
+                                                                color="warning"
+                                                            >
+                                                                <PaymentIcon />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                    )}
                                                     {request.paymentStatus === 'paid' && request.status === 'paid' && user?.userType === 'couple' && (
                                                         <Tooltip title="Payment Completed">
-                                                            <IconButton
-                                                                color="success"
-                                                                disabled
-                                                            >
-                                                                <CheckCircleIcon />
-                                                            </IconButton>
+                                                            <span>
+                                                                <IconButton
+                                                                    color="success"
+                                                                    disabled
+                                                                >
+                                                                    <CheckCircleIcon />
+                                                                </IconButton>
+                                                            </span>
                                                         </Tooltip>
                                                     )}
                                                     {request.status === 'approved' && (
                                                         <Tooltip title="Certificate Approved - Awaiting Issuance">
-                                                            <IconButton
-                                                                color="info"
-                                                                disabled
-                                                            >
-                                                                <ApproveIcon />
-                                                            </IconButton>
+                                                            <span>
+                                                                <IconButton
+                                                                    color="info"
+                                                                    disabled
+                                                                >
+                                                                    <ApproveIcon />
+                                                                </IconButton>
+                                                            </span>
                                                         </Tooltip>
                                                     )}
                                                     {(request.status === 'approved' || request.status === 'issued') && (
@@ -420,8 +571,11 @@ const CertificateRequest = () => {
                                         label="Certificate Type"
                                         onChange={(e) => setSelectedCertificateType(e.target.value)}
                                     >
-                                        <MenuItem value="sector">Sector Certificate (Civil)</MenuItem>
-                                        <MenuItem value="church">Church Certificate (Religious)</MenuItem>
+                                        {getAvailableCertificateTypes(selectedApplication).map((type) => (
+                                            <MenuItem key={type.value} value={type.value}>
+                                                {type.label}
+                                            </MenuItem>
+                                        ))}
                                     </Select>
                                 </FormControl>
 
@@ -432,46 +586,101 @@ const CertificateRequest = () => {
                         )}
                     </DialogContent>
                     <DialogActions>
-                        <Button onClick={() => setRequestDialogOpen(false)}>Cancel</Button>
+                        <Button
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setRequestDialogOpen(false);
+                            }}
+                            type="button"
+                        >
+                            Cancel
+                        </Button>
                         <Button
                             onClick={confirmRequest}
                             variant="contained"
                             disabled={createRequestMutation.isLoading}
+                            type="button"
                         >
                             {createRequestMutation.isLoading ? 'Creating...' : 'Request Certificate'}
                         </Button>
                     </DialogActions>
                 </Dialog>
 
-                {/* Payment Dialog */}
-                <Dialog open={paymentDialogOpen} onClose={() => setPaymentDialogOpen(false)}>
-                    <DialogTitle>Record Payment</DialogTitle>
-                    <DialogContent>
-                        <TextField
-                            autoFocus
-                            margin="dense"
-                            label="Payment Reference"
-                            placeholder="Enter payment reference number"
-                            fullWidth
-                            variant="outlined"
-                            value={paymentReference}
-                            onChange={(e) => setPaymentReference(e.target.value)}
-                            sx={{ mt: 2 }}
-                        />
-                        <Alert severity="info" sx={{ mt: 2 }}>
-                            Please enter the payment reference number from your bank transfer or mobile money payment.
-                        </Alert>
-                    </DialogContent>
-                    <DialogActions>
-                        <Button onClick={() => setPaymentDialogOpen(false)}>Cancel</Button>
-                        <Button
-                            onClick={confirmPayment}
-                            variant="contained"
-                            disabled={payRequestMutation.isLoading || !paymentReference.trim()}
-                        >
-                            {payRequestMutation.isLoading ? 'Recording...' : 'Record Payment'}
-                        </Button>
-                    </DialogActions>
+                {/* ITEC Pay Payment Dialog */}
+                <Dialog
+                    open={paymentDialogOpen}
+                    onClose={(e, reason) => {
+                        if (reason === 'backdropClick' || reason === 'escapeKeyDown') {
+                            setPaymentDialogOpen(false);
+                        }
+                    }}
+                >
+                    <form onSubmit={(e) => e.preventDefault()}>
+                        <DialogTitle>
+                            {selectedApplication?.paymentStatus === 'failed' ? 'Retry Payment with ITEC Pay' : 'Pay with ITEC Pay'}
+                        </DialogTitle>
+                        <DialogContent>
+                            <TextField
+                                autoFocus
+                                margin="dense"
+                                label="Phone Number"
+                                placeholder="Enter your phone number (e.g., 0791724884)"
+                                fullWidth
+                                variant="outlined"
+                                value={phoneNumber}
+                                onChange={(e) => setPhoneNumber(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        confirmPayment();
+                                    }
+                                }}
+                                sx={{ mt: 2 }}
+                            />
+                            {selectedApplication?.paymentStatus === 'failed' && (
+                                <Alert severity="warning" sx={{ mt: 2 }}>
+                                    <strong>Previous payment failed</strong><br />
+                                    Please try again with a valid phone number and ensure you have sufficient balance.
+                                </Alert>
+                            )}
+                            {selectedApplication?.paymentStatus === 'processing' && (
+                                <Alert severity="info" sx={{ mt: 2 }}>
+                                    <strong>Payment is being processed</strong><br />
+                                    Please confirm the payment on your phone. The system will automatically update when confirmed.
+                                </Alert>
+                            )}
+                            <Alert severity="info" sx={{ mt: 2 }}>
+                                <strong>Amount: 100 RWF</strong><br />
+                                You will receive a payment prompt on your phone to complete the payment via ITEC Pay.
+                            </Alert>
+                        </DialogContent>
+                        <DialogActions>
+                            <Button
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    e.nativeEvent.stopImmediatePropagation();
+                                    setPaymentDialogOpen(false);
+                                }}
+                                onMouseDown={(e) => e.preventDefault()}
+                                type="button"
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                onClick={confirmPayment}
+                                variant="contained"
+                                disabled={payRequestMutation.isLoading || !phoneNumber.trim() || selectedApplication?.paymentStatus === 'processing'}
+                                color={selectedApplication?.paymentStatus === 'failed' ? 'warning' : 'primary'}
+                                type="button"
+                            >
+                                {payRequestMutation.isLoading ? 'Processing...' :
+                                    selectedApplication?.paymentStatus === 'failed' ? 'Retry Payment 100 RWF' :
+                                        selectedApplication?.paymentStatus === 'processing' ? 'Payment Processing...' : 'Pay 100 RWF'}
+                            </Button>
+                        </DialogActions>
+                    </form>
                 </Dialog>
             </Container>
         </Box>

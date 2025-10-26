@@ -14,6 +14,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
+import NotificationBell from './NotificationBell';
 
 const DashboardHeader = ({
     title,
@@ -86,6 +87,7 @@ const DashboardHeader = ({
 
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 {actionButton}
+                <NotificationBell />
                 {showLogoutButton && (
                     <Tooltip title="Logout">
                         <Button

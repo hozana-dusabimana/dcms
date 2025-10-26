@@ -27,6 +27,10 @@ import {
     Grid,
     Pagination,
     Stack,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
 } from '@mui/material';
 import {
     Visibility as ViewIcon,
@@ -34,6 +38,8 @@ import {
     Cancel as RejectIcon,
     Search as SearchIcon,
     FilterList as FilterIcon,
+    Event as CompleteIcon,
+    Gavel as CivilCompleteIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
@@ -52,6 +58,23 @@ const Applications = () => {
     const [statusFilter, setStatusFilter] = useState('all');
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
+
+    // Complete marriage dialog state
+    const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
+    const [selectedApplication, setSelectedApplication] = useState(null);
+    const [completeForm, setCompleteForm] = useState({
+        marriageDate: '',
+        marriageLocation: '',
+        comments: ''
+    });
+
+    // Civil complete marriage dialog state
+    const [civilCompleteDialogOpen, setCivilCompleteDialogOpen] = useState(false);
+    const [civilCompleteForm, setCivilCompleteForm] = useState({
+        civilMarriageDate: '',
+        civilMarriageLocation: '',
+        comments: ''
+    });
 
     // Build query parameters
     const queryParams = useMemo(() => {
@@ -132,6 +155,38 @@ const Applications = () => {
         }
     );
 
+    // Complete marriage mutation (Church Leader)
+    const completeMarriageMutation = useMutation(
+        ({ applicationId, data }) => api.put(`/applications/${applicationId}/complete`, data),
+        {
+            onSuccess: () => {
+                queryClient.invalidateQueries(['applications']);
+                toast.success('Marriage marked as completed successfully');
+                setCompleteDialogOpen(false);
+                setCompleteForm({ marriageDate: '', marriageLocation: '', comments: '' });
+            },
+            onError: (error) => {
+                toast.error(error.response?.data?.message || 'Failed to complete marriage');
+            },
+        }
+    );
+
+    // Civil complete marriage mutation (Civil Admin)
+    const civilCompleteMarriageMutation = useMutation(
+        ({ applicationId, data }) => api.put(`/applications/${applicationId}/civil-complete`, data),
+        {
+            onSuccess: () => {
+                queryClient.invalidateQueries(['applications']);
+                toast.success('Civil marriage marked as completed successfully');
+                setCivilCompleteDialogOpen(false);
+                setCivilCompleteForm({ civilMarriageDate: '', civilMarriageLocation: '', comments: '' });
+            },
+            onError: (error) => {
+                toast.error(error.response?.data?.message || 'Failed to complete civil marriage');
+            },
+        }
+    );
+
     const getStatusColor = (status) => {
         switch (status) {
             case 'pending': return 'warning';
@@ -139,7 +194,8 @@ const Applications = () => {
             case 'sector_approved': return 'primary';
             case 'approved': return 'success';
             case 'rejected': return 'error';
-            case 'completed': return 'info';
+            case 'completed': return 'success';
+            case 'civil_completed': return 'info';
             default: return 'default';
         }
     };
@@ -171,6 +227,50 @@ const Applications = () => {
         }
     };
 
+    const handleCompleteMarriage = (application) => {
+        setSelectedApplication(application);
+        setCompleteForm({
+            marriageDate: application.marriageDate || '',
+            marriageLocation: '',
+            comments: ''
+        });
+        setCompleteDialogOpen(true);
+    };
+
+    const handleSubmitComplete = () => {
+        if (!completeForm.marriageDate || !completeForm.marriageLocation) {
+            toast.error('Please fill in all required fields');
+            return;
+        }
+
+        completeMarriageMutation.mutate({
+            applicationId: selectedApplication.id,
+            data: completeForm
+        });
+    };
+
+    const handleCivilCompleteMarriage = (application) => {
+        setSelectedApplication(application);
+        setCivilCompleteForm({
+            civilMarriageDate: application.marriageDate || '',
+            civilMarriageLocation: '',
+            comments: ''
+        });
+        setCivilCompleteDialogOpen(true);
+    };
+
+    const handleSubmitCivilComplete = () => {
+        if (!civilCompleteForm.civilMarriageDate || !civilCompleteForm.civilMarriageLocation) {
+            toast.error('Please fill in all required fields');
+            return;
+        }
+
+        civilCompleteMarriageMutation.mutate({
+            applicationId: selectedApplication.id,
+            data: civilCompleteForm
+        });
+    };
+
     // Check if user can approve/reject based on application status and user type
     const canApproveReject = (application) => {
         if (!canReview) return false;
@@ -182,6 +282,16 @@ const Applications = () => {
         }
 
         return false;
+    };
+
+    // Check if user can complete marriage (only church leaders for sector_approved, approved, or civil_completed applications)
+    const canCompleteMarriage = (application) => {
+        return user?.userType === 'church_leader' && ['sector_approved', 'approved', 'civil_completed'].includes(application.status);
+    };
+
+    // Check if user can complete civil marriage (only civil admins for sector_approved or approved applications)
+    const canCompleteCivilMarriage = (application) => {
+        return user?.userType === 'civil_admin' && ['sector_approved', 'approved'].includes(application.status);
     };
 
     if (isLoading) {
@@ -212,7 +322,7 @@ const Applications = () => {
                     subtitle={user?.userType === 'couple'
                         ? 'View and track your marriage applications'
                         : user?.userType === 'church_leader'
-                            ? 'Review applications approved by sector'
+                            ? 'Review and manage marriage applications (excluding pending)'
                             : 'Review and manage marriage applications'
                     }
                     actionButton={user?.userType === 'couple' ? (
@@ -373,6 +483,28 @@ const Applications = () => {
                                                     </Tooltip>
                                                 </>
                                             )}
+                                            {canCompleteMarriage(application) && (
+                                                <Tooltip title="Complete Marriage">
+                                                    <IconButton
+                                                        onClick={() => handleCompleteMarriage(application)}
+                                                        color="primary"
+                                                        disabled={completeMarriageMutation.isLoading}
+                                                    >
+                                                        <CompleteIcon />
+                                                    </IconButton>
+                                                </Tooltip>
+                                            )}
+                                            {canCompleteCivilMarriage(application) && (
+                                                <Tooltip title="Complete Civil Marriage">
+                                                    <IconButton
+                                                        onClick={() => handleCivilCompleteMarriage(application)}
+                                                        color="secondary"
+                                                        disabled={civilCompleteMarriageMutation.isLoading}
+                                                    >
+                                                        <CivilCompleteIcon />
+                                                    </IconButton>
+                                                </Tooltip>
+                                            )}
                                         </TableCell>
                                     </TableRow>
                                 ))}
@@ -431,6 +563,126 @@ const Applications = () => {
                         </Stack>
                     </Box>
                 )}
+
+                {/* Complete Marriage Dialog */}
+                <Dialog
+                    open={completeDialogOpen}
+                    onClose={() => setCompleteDialogOpen(false)}
+                    maxWidth="sm"
+                    fullWidth
+                >
+                    <DialogTitle>Complete Marriage</DialogTitle>
+                    <DialogContent>
+                        {selectedApplication && (
+                            <Box sx={{ mb: 2 }}>
+                                <Typography variant="body2" color="text.secondary">
+                                    Completing marriage for: <strong>{selectedApplication.groomFirstName} {selectedApplication.groomLastName}</strong> & <strong>{selectedApplication.brideFirstName} {selectedApplication.brideLastName}</strong>
+                                </Typography>
+                            </Box>
+                        )}
+                        <TextField
+                            fullWidth
+                            label="Marriage Date"
+                            type="date"
+                            value={completeForm.marriageDate}
+                            onChange={(e) => setCompleteForm(prev => ({ ...prev, marriageDate: e.target.value }))}
+                            margin="normal"
+                            required
+                            InputLabelProps={{ shrink: true }}
+                        />
+                        <TextField
+                            fullWidth
+                            label="Marriage Location"
+                            value={completeForm.marriageLocation}
+                            onChange={(e) => setCompleteForm(prev => ({ ...prev, marriageLocation: e.target.value }))}
+                            margin="normal"
+                            required
+                            placeholder="e.g., St. Mary Catholic Church, Kigali"
+                        />
+                        <TextField
+                            fullWidth
+                            label="Comments (Optional)"
+                            multiline
+                            rows={3}
+                            value={completeForm.comments}
+                            onChange={(e) => setCompleteForm(prev => ({ ...prev, comments: e.target.value }))}
+                            margin="normal"
+                            placeholder="Any additional notes about the ceremony..."
+                        />
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setCompleteDialogOpen(false)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleSubmitComplete}
+                            variant="contained"
+                            disabled={completeMarriageMutation.isLoading}
+                        >
+                            {completeMarriageMutation.isLoading ? 'Completing...' : 'Complete Marriage'}
+                        </Button>
+                    </DialogActions>
+                </Dialog>
+
+                {/* Civil Complete Marriage Dialog */}
+                <Dialog
+                    open={civilCompleteDialogOpen}
+                    onClose={() => setCivilCompleteDialogOpen(false)}
+                    maxWidth="sm"
+                    fullWidth
+                >
+                    <DialogTitle>Complete Civil Marriage</DialogTitle>
+                    <DialogContent>
+                        {selectedApplication && (
+                            <Box sx={{ mb: 2 }}>
+                                <Typography variant="body2" color="text.secondary">
+                                    Completing civil marriage for: <strong>{selectedApplication.groomFirstName} {selectedApplication.groomLastName}</strong> & <strong>{selectedApplication.brideFirstName} {selectedApplication.brideLastName}</strong>
+                                </Typography>
+                            </Box>
+                        )}
+                        <TextField
+                            fullWidth
+                            label="Civil Marriage Date"
+                            type="date"
+                            value={civilCompleteForm.civilMarriageDate}
+                            onChange={(e) => setCivilCompleteForm(prev => ({ ...prev, civilMarriageDate: e.target.value }))}
+                            margin="normal"
+                            required
+                            InputLabelProps={{ shrink: true }}
+                        />
+                        <TextField
+                            fullWidth
+                            label="Civil Marriage Location"
+                            value={civilCompleteForm.civilMarriageLocation}
+                            onChange={(e) => setCivilCompleteForm(prev => ({ ...prev, civilMarriageLocation: e.target.value }))}
+                            margin="normal"
+                            required
+                            placeholder="e.g., Civil Registry Office, Kigali"
+                        />
+                        <TextField
+                            fullWidth
+                            label="Comments (Optional)"
+                            multiline
+                            rows={3}
+                            value={civilCompleteForm.comments}
+                            onChange={(e) => setCivilCompleteForm(prev => ({ ...prev, comments: e.target.value }))}
+                            margin="normal"
+                            placeholder="Any additional notes about the civil ceremony..."
+                        />
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setCivilCompleteDialogOpen(false)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleSubmitCivilComplete}
+                            variant="contained"
+                            disabled={civilCompleteMarriageMutation.isLoading}
+                        >
+                            {civilCompleteMarriageMutation.isLoading ? 'Completing...' : 'Complete Civil Marriage'}
+                        </Button>
+                    </DialogActions>
+                </Dialog>
             </Container>
         </Box>
     );

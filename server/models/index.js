@@ -11,6 +11,7 @@ const CertificateRequest = require('./CertificateRequest');
 const ChurchService = require('./ChurchService');
 const ChurchMember = require('./ChurchMember');
 const ServiceComment = require('./ServiceComment');
+const ServiceRequest = require('./ServiceRequest');
 
 // Define associations
 const defineAssociations = () => {
@@ -68,6 +69,17 @@ const defineAssociations = () => {
 
     ChurchService.hasMany(ServiceComment, { foreignKey: 'serviceId', as: 'comments' });
     ChurchMember.hasMany(ServiceComment, { foreignKey: 'memberId', as: 'comments' });
+
+    // ServiceRequest associations
+    ServiceRequest.belongsTo(ChurchMember, { foreignKey: 'memberId', as: 'member' });
+    ServiceRequest.belongsTo(ChurchService, { foreignKey: 'relatedServiceId', as: 'relatedService' });
+    ServiceRequest.belongsTo(User, { foreignKey: 'assignedToId', as: 'assignedTo' });
+    ServiceRequest.belongsTo(User, { foreignKey: 'reviewedBy', as: 'reviewer' });
+
+    ChurchMember.hasMany(ServiceRequest, { foreignKey: 'memberId', as: 'serviceRequests' });
+    ChurchService.hasMany(ServiceRequest, { foreignKey: 'relatedServiceId', as: 'serviceRequests' });
+    User.hasMany(ServiceRequest, { foreignKey: 'assignedToId', as: 'assignedServiceRequests' });
+    User.hasMany(ServiceRequest, { foreignKey: 'reviewedBy', as: 'reviewedServiceRequests' });
 };
 
 // Initialize associations
@@ -84,5 +96,6 @@ module.exports = {
     CertificateRequest,
     ChurchService,
     ChurchMember,
-    ServiceComment
+    ServiceComment,
+    ServiceRequest
 };

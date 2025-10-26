@@ -116,7 +116,7 @@ const MarriageApplication = sequelize.define('MarriageApplication', {
     },
     // Status and Processing
     status: {
-        type: DataTypes.ENUM('pending', 'under_review', 'sector_approved', 'approved', 'rejected', 'completed'),
+        type: DataTypes.ENUM('pending', 'under_review', 'sector_approved', 'approved', 'rejected', 'completed', 'civil_completed'),
         allowNull: false,
         defaultValue: 'pending'
     },
@@ -175,6 +175,59 @@ const MarriageApplication = sequelize.define('MarriageApplication', {
         type: DataTypes.DATE,
         allowNull: true,
         field: 'church_reviewed_at'
+    },
+    marriageLocation: {
+        type: DataTypes.STRING(200),
+        allowNull: true,
+        field: 'marriage_location'
+    },
+    completionComments: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+        field: 'completion_comments'
+    },
+    completedBy: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        field: 'completed_by',
+        references: {
+            model: 'users',
+            key: 'id'
+        }
+    },
+    completedAt: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        field: 'completed_at'
+    },
+    civilMarriageDate: {
+        type: DataTypes.DATEONLY,
+        allowNull: true,
+        field: 'civil_marriage_date'
+    },
+    civilMarriageLocation: {
+        type: DataTypes.STRING(200),
+        allowNull: true,
+        field: 'civil_marriage_location'
+    },
+    civilCompletionComments: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+        field: 'civil_completion_comments'
+    },
+    civilCompletedBy: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        field: 'civil_completed_by',
+        references: {
+            model: 'users',
+            key: 'id'
+        }
+    },
+    civilCompletedAt: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        field: 'civil_completed_at'
     }
 }, {
     tableName: 'marriage_applications'

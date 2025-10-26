@@ -23,3 +23,5 @@ const createServiceCommentsTable = async () => {
 // Run the script
 createServiceCommentsTable();
 
+
+

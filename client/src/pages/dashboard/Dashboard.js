@@ -16,6 +16,7 @@ import {
     Notifications as NotificationsIcon,
     Business as BusinessIcon,
     Assessment as AssessmentIcon,
+    RequestQuote as RequestIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -66,6 +67,9 @@ const Dashboard = () => {
                 break;
             case 'Manage Certificates':
                 navigate('/dashboard/certificate-management');
+                break;
+            case 'Manage Service Requests':
+                navigate('/dashboard/service-requests');
                 break;
             default:
                 console.log('Action not implemented:', action);
@@ -128,6 +132,20 @@ const Dashboard = () => {
                             color: theme.palette.success.main,
                             action: 'View Members',
                         },
+                        {
+                            title: 'Service Requests',
+                            description: 'Manage service requests from church members',
+                            icon: <RequestIcon sx={{ fontSize: 40 }} />,
+                            color: theme.palette.info.main,
+                            action: 'Manage Service Requests',
+                        },
+                        {
+                            title: 'Certificate Management',
+                            description: 'Approve and manage wedding certificate requests',
+                            icon: <AssignmentIcon sx={{ fontSize: 40 }} />,
+                            color: theme.palette.warning.main,
+                            action: 'Manage Certificates',
+                        },
                     ],
                 };
             case 'civil_admin':
@@ -177,6 +195,13 @@ const Dashboard = () => {
                             color: theme.palette.info.main,
                             action: 'Manage Certificates',
                         },
+                        {
+                            title: 'Service Requests',
+                            description: 'Manage service requests from church members',
+                            icon: <RequestIcon sx={{ fontSize: 40 }} />,
+                            color: theme.palette.warning.main,
+                            action: 'Manage Service Requests',
+                        },
                     ],
                 };
             case 'super_admin':
@@ -225,6 +250,13 @@ const Dashboard = () => {
                             icon: <AssignmentIcon sx={{ fontSize: 40 }} />,
                             color: theme.palette.info.main,
                             action: 'Manage Certificates',
+                        },
+                        {
+                            title: 'Service Requests',
+                            description: 'Manage service requests from church members',
+                            icon: <RequestIcon sx={{ fontSize: 40 }} />,
+                            color: theme.palette.warning.main,
+                            action: 'Manage Service Requests',
                         },
                     ],
                 };

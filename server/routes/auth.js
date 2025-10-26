@@ -1,9 +1,11 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const { body, validationResult } = require('express-validator');
 const { Op } = require('sequelize');
 const User = require('../models/User');
 const { auth, authorize } = require('../middleware/auth-simple');
+const transporter = require('../config/email');
 
 const router = express.Router();
 
@@ -287,6 +289,189 @@ router.put('/change-password', auth, [
     } catch (error) {
         console.error('Password change error:', error);
         res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// @route   POST /api/auth/forgot-password
+// @desc    Send password reset email
+// @access  Public
+router.post('/forgot-password', [
+    body('email').isEmail().withMessage('Please provide a valid email')
+], async (req, res) => {
+    try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ errors: errors.array() });
+        }
+
+        const { email } = req.body;
+
+        // Find user by email
+        const user = await User.findOne({ where: { email } });
+        if (!user) {
+            return res.status(404).json({ 
+                success: false,
+                message: 'No account found with that email address' 
+            });
+        }
+
+        // Check if user is active
+        if (!user.isActive) {
+            return res.status(400).json({ 
+                success: false,
+                message: 'Account is deactivated' 
+            });
+        }
+
+        // Generate reset token
+        const resetToken = crypto.randomBytes(32).toString('hex');
+        const resetExpires = new Date(Date.now() + 3600000); // 1 hour from now
+
+        // Save reset token to user
+        user.resetPasswordToken = resetToken;
+        user.resetPasswordExpires = resetExpires;
+        await user.save();
+
+        // Create reset URL
+        const resetUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/reset-password/${resetToken}`;
+
+        // Email content
+        const mailOptions = {
+            from: process.env.EMAIL_USER || 'lanari.rw@gmail.com',
+            to: user.email,
+            subject: 'Password Reset Request - DMCS MIS',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: #333;">Password Reset Request</h2>
+                    <p>Hello ${user.firstName},</p>
+                    <p>You have requested to reset your password for your DMCS MIS account.</p>
+                    <p>Click the button below to reset your password:</p>
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="${resetUrl}" 
+                           style="background: linear-gradient(45deg, #667eea 30%, #764ba2 90%); 
+                                  color: white; 
+                                  padding: 12px 30px; 
+                                  text-decoration: none; 
+                                  border-radius: 5px; 
+                                  display: inline-block;">
+                            Reset Password
+                        </a>
+                    </div>
+                    <p>Or copy and paste this link in your browser:</p>
+                    <p style="word-break: break-all; color: #666;">${resetUrl}</p>
+                    <p><strong>This link will expire in 1 hour.</strong></p>
+                    <p>If you didn't request this password reset, please ignore this email.</p>
+                    <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
+                    <p style="color: #666; font-size: 12px;">
+                        This is an automated message from DMCS MIS. Please do not reply to this email.
+                    </p>
+                </div>
+            `
+        };
+
+        // Send email
+        await transporter.sendMail(mailOptions);
+
+        res.json({
+            success: true,
+            message: 'Password reset instructions have been sent to your email address'
+        });
+
+    } catch (error) {
+        console.error('Forgot password error:', error);
+        res.status(500).json({ 
+            success: false,
+            message: 'Server error during password reset request' 
+        });
+    }
+});
+
+// @route   GET /api/auth/verify-reset-token/:token
+// @desc    Verify password reset token
+// @access  Public
+router.get('/verify-reset-token/:token', async (req, res) => {
+    try {
+        const { token } = req.params;
+
+        const user = await User.findOne({
+            where: {
+                resetPasswordToken: token,
+                resetPasswordExpires: {
+                    [Op.gt]: new Date()
+                }
+            }
+        });
+
+        if (!user) {
+            return res.status(400).json({ 
+                valid: false,
+                message: 'Invalid or expired reset token' 
+            });
+        }
+
+        res.json({ 
+            valid: true,
+            message: 'Token is valid' 
+        });
+
+    } catch (error) {
+        console.error('Token verification error:', error);
+        res.status(500).json({ 
+            valid: false,
+            message: 'Server error during token verification' 
+        });
+    }
+});
+
+// @route   POST /api/auth/reset-password
+// @desc    Reset user password
+// @access  Public
+router.post('/reset-password', [
+    body('token').notEmpty().withMessage('Reset token is required'),
+    body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters')
+], async (req, res) => {
+    try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ errors: errors.array() });
+        }
+
+        const { token, password } = req.body;
+
+        // Find user with valid reset token
+        const user = await User.findOne({
+            where: {
+                resetPasswordToken: token,
+                resetPasswordExpires: {
+                    [Op.gt]: new Date()
+                }
+            }
+        });
+
+        if (!user) {
+            return res.status(400).json({ 
+                success: false,
+                message: 'Invalid or expired reset token' 
+            });
+        }
+
+        // Update password
+        user.password = password;
+        user.resetPasswordToken = null;
+        user.resetPasswordExpires = null;
+        await user.save();
+
+        res.json({
+            success: true,
+            message: 'Password has been reset successfully'
+        });
+
+    } catch (error) {
+        console.error('Reset password error:', error);
+        res.status(500).json({ 
+            success: false,
+            message: 'Server error during password reset' 
+        });
     }
 });
 

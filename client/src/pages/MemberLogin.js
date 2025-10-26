@@ -6,6 +6,7 @@ import {
     TextField,
     Button,
     Typography,
+    Link,
     Alert,
     CircularProgress,
     Card,
@@ -14,7 +15,7 @@ import {
 } from '@mui/material';
 import { Phone as PhoneIcon } from '@mui/icons-material';
 import { useMemberAuth } from '../contexts/MemberAuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link as RouterLink } from 'react-router-dom';
 
 const MemberLogin = () => {
     const [phone, setPhone] = useState('');
@@ -113,6 +114,11 @@ const MemberLogin = () => {
                         <Box sx={{ mt: 3, textAlign: 'center' }}>
                             <Typography variant="body2" color="text.secondary">
                                 Having trouble accessing your account? Contact your church administrator.
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                <Link component={RouterLink} to="/forgot-password" sx={{ fontWeight: 'medium' }}>
+                                    Forgot your password?
+                                </Link>
                             </Typography>
                         </Box>
                     </CardContent>

@@ -1,22 +1,56 @@
 const express = require('express');
+const { auth, authorize } = require('../middleware/auth-simple');
+const { Notification } = require('../models');
+
 const router = express.Router();
-const Notification = require('../models/Notification');
-const { auth } = require('../middleware/auth-simple');
 
 // @route   GET /api/notifications
 // @desc    Get user notifications
 // @access  Private
 router.get('/', auth, async (req, res) => {
     try {
-        const notifications = await Notification.findAll({
-            where: { userId: req.userId },
+        const { page = 1, limit = 20, unreadOnly = false } = req.query;
+        const offset = (page - 1) * limit;
+
+        let whereClause = { userId: req.userId };
+        if (unreadOnly === 'true') {
+            whereClause.isRead = false;
+        }
+
+        const { count, rows: notifications } = await Notification.findAndCountAll({
+            where: whereClause,
             order: [['createdAt', 'DESC']],
-            limit: 50
+            limit: parseInt(limit),
+            offset: parseInt(offset)
         });
 
-        res.json({ notifications });
+        res.json({
+            notifications,
+            total: count,
+            pages: Math.ceil(count / limit),
+            currentPage: parseInt(page)
+        });
     } catch (error) {
         console.error('Get notifications error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// @route   GET /api/notifications/unread-count
+// @desc    Get unread notifications count
+// @access  Private
+router.get('/unread-count', auth, async (req, res) => {
+    try {
+        const count = await Notification.count({
+            where: {
+                userId: req.userId,
+                isRead: false
+            }
+        });
+
+        res.json({ count });
+    } catch (error) {
+        console.error('Get unread count error:', error);
         res.status(500).json({ message: 'Server error' });
     }
 });
@@ -26,9 +60,11 @@ router.get('/', auth, async (req, res) => {
 // @access  Private
 router.put('/:id/read', auth, async (req, res) => {
     try {
+        const { id } = req.params;
+
         const notification = await Notification.findOne({
             where: {
-                id: req.params.id,
+                id: id,
                 userId: req.userId
             }
         });
@@ -44,7 +80,7 @@ router.put('/:id/read', auth, async (req, res) => {
 
         res.json({ message: 'Notification marked as read' });
     } catch (error) {
-        console.error('Mark notification read error:', error);
+        console.error('Mark notification as read error:', error);
         res.status(500).json({ message: 'Server error' });
     }
 });
@@ -69,38 +105,21 @@ router.put('/mark-all-read', auth, async (req, res) => {
 
         res.json({ message: 'All notifications marked as read' });
     } catch (error) {
-        console.error('Mark all notifications read error:', error);
-        res.status(500).json({ message: 'Server error' });
-    }
-});
-
-// @route   GET /api/notifications/unread-count
-// @desc    Get unread notification count
-// @access  Private
-router.get('/unread-count', auth, async (req, res) => {
-    try {
-        const count = await Notification.count({
-            where: {
-                userId: req.userId,
-                isRead: false
-            }
-        });
-
-        res.json({ count });
-    } catch (error) {
-        console.error('Get unread count error:', error);
+        console.error('Mark all notifications as read error:', error);
         res.status(500).json({ message: 'Server error' });
     }
 });
 
 // @route   DELETE /api/notifications/:id
-// @desc    Delete a notification
+// @desc    Delete notification
 // @access  Private
 router.delete('/:id', auth, async (req, res) => {
     try {
+        const { id } = req.params;
+
         const notification = await Notification.findOne({
             where: {
-                id: req.params.id,
+                id: id,
                 userId: req.userId
             }
         });

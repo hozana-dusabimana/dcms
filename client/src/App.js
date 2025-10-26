@@ -49,10 +49,15 @@ import ChurchServices from './pages/dashboard/ChurchServices';
 import ChurchMembers from './pages/dashboard/ChurchMembers';
 import AddChurchService from './pages/dashboard/AddChurchService';
 import AddChurchMember from './pages/dashboard/AddChurchMember';
+import ServiceRequestManagement from './pages/dashboard/ServiceRequestManagement';
 
 // Member Pages
 import MemberLogin from './pages/MemberLogin';
 import MemberDashboard from './pages/MemberDashboard';
+
+// Auth Pages
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 
 // Create React Query client
 const queryClient = new QueryClient({
@@ -129,6 +134,8 @@ function App() {
                                         <Route path="/" element={<Layout><Home /></Layout>} />
                                         <Route path="/login" element={<Login />} />
                                         <Route path="/register" element={<Register />} />
+                                        <Route path="/forgot-password" element={<ForgotPassword />} />
+                                        <Route path="/reset-password/:token" element={<ResetPassword />} />
                                         <Route path="/about" element={<Layout><About /></Layout>} />
                                         <Route path="/churches" element={<Layout><Churches /></Layout>} />
                                         <Route path="/services" element={<Layout><Services /></Layout>} />
@@ -199,7 +206,7 @@ function App() {
                                             </ProtectedRoute>
                                         } />
                                         <Route path="/dashboard/certificate-management" element={
-                                            <ProtectedRoute allowedRoles={['civil_admin', 'super_admin']}>
+                                            <ProtectedRoute allowedRoles={['church_leader', 'civil_admin', 'super_admin']}>
                                                 <CertificateManagement />
                                             </ProtectedRoute>
                                         } />
@@ -251,6 +258,11 @@ function App() {
                                         <Route path="/dashboard/church-members/:id/edit" element={
                                             <ProtectedRoute allowedRoles={['church_leader', 'super_admin']}>
                                                 <AddChurchMember />
+                                            </ProtectedRoute>
+                                        } />
+                                        <Route path="/dashboard/service-requests" element={
+                                            <ProtectedRoute allowedRoles={['church_leader', 'civil_admin', 'super_admin']}>
+                                                <ServiceRequestManagement />
                                             </ProtectedRoute>
                                         } />
 

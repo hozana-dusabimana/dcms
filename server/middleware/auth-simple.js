@@ -48,4 +48,23 @@ const authorize = (...roles) => {
     };
 };
 
-module.exports = { auth, authorize };
+const memberAuth = (req, res, next) => {
+    console.log('Member auth middleware called');
+
+    try {
+        const token = req.header('Authorization')?.replace('Bearer ', '');
+
+        if (!token) {
+            return res.status(401).json({ message: 'No token, authorization denied' });
+        }
+
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+        req.memberId = decoded.memberId;
+        next();
+    } catch (error) {
+        console.error('Member auth middleware error:', error);
+        res.status(401).json({ message: 'Token is not valid' });
+    }
+};
+
+module.exports = { auth, authorize, memberAuth };

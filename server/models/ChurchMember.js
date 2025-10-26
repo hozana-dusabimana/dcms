@@ -119,3 +119,5 @@ const ChurchMember = sequelize.define('ChurchMember', {
 
 module.exports = ChurchMember;
 
+
+

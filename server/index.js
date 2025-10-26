@@ -97,6 +97,9 @@ app.use('/api/church-services', require('./routes/churchServices'));
 app.use('/api/church-members', require('./routes/churchMembers'));
 app.use('/api/member-auth', require('./routes/memberAuth'));
 app.use('/api/service-comments', require('./routes/serviceComments'));
+app.use('/api/service-requests', require('./routes/serviceRequests'));
+app.use('/api/notifications', require('./routes/notifications'));
+app.use('/api/member-notifications', require('./routes/memberNotifications'));
 
 // Health check
 app.get('/api/health', (req, res) => {

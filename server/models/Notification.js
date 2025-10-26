@@ -53,6 +53,17 @@ const Notification = sequelize.define('Notification', {
         type: DataTypes.STRING(500),
         allowNull: true,
         field: 'action_url'
+    },
+    data: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+        get() {
+            const value = this.getDataValue('data');
+            return value ? JSON.parse(value) : null;
+        },
+        set(value) {
+            this.setDataValue('data', value ? JSON.stringify(value) : null);
+        }
     }
 }, {
     tableName: 'notifications'

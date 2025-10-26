@@ -3,6 +3,7 @@ const router = express.Router();
 const { CertificateRequest, MarriageApplication, User } = require('../models');
 const { auth, authorize } = require('../middleware/auth-simple');
 const { Op } = require('sequelize');
+const paymentService = require('../services/paymentService');
 
 // @route   GET /api/certificate-requests
 // @desc    Get certificate requests based on user role with pagination
@@ -31,6 +32,9 @@ router.get('/', auth, async (req, res) => {
         // Filter based on user role
         if (user.userType === 'couple') {
             whereClause.userId = req.userId;
+        } else if (user.userType === 'church_leader') {
+            // Church leaders can see requests for applications in their church
+            // We'll filter this in the include clause instead
         } else if (user.userType === 'civil_admin' || user.userType === 'super_admin') {
             // Admins can see all requests
         }
@@ -54,16 +58,23 @@ router.get('/', auth, async (req, res) => {
             whereClause.certificateType = certificateType;
         }
 
-        const totalCount = await CertificateRequest.count({ where: whereClause });
+        // Build include clause
+        const includeClause = [
+            {
+                model: MarriageApplication,
+                as: 'application',
+                attributes: ['id', 'applicationNumber', 'groomFirstName', 'groomLastName', 'brideFirstName', 'brideLastName', 'marriageDate'],
+                where: user.userType === 'church_leader' ? { churchId: user.churchId } : {}
+            }
+        ];
+
+        const totalCount = await CertificateRequest.count({
+            where: whereClause,
+            include: includeClause
+        });
         const certificateRequests = await CertificateRequest.findAll({
             where: whereClause,
-            include: [
-                {
-                    model: MarriageApplication,
-                    as: 'application',
-                    attributes: ['id', 'applicationNumber', 'groomFirstName', 'groomLastName', 'brideFirstName', 'brideLastName', 'marriageDate']
-                }
-            ],
+            include: includeClause,
             order: [[sortBy, sortOrder.toUpperCase()]],
             limit: parseInt(limit),
             offset: offset
@@ -99,8 +110,8 @@ router.post('/', auth, async (req, res) => {
             return res.status(400).json({ message: 'Application ID is required' });
         }
 
-        if (!['sector', 'church'].includes(certificateType)) {
-            return res.status(400).json({ message: 'Certificate type must be either "sector" or "church"' });
+        if (!['sector', 'church', 'civil', 'religious'].includes(certificateType)) {
+            return res.status(400).json({ message: 'Certificate type must be "sector", "church", "civil", or "religious"' });
         }
 
         // Check if application exists
@@ -116,12 +127,20 @@ router.post('/', auth, async (req, res) => {
 
         // Check application status based on certificate type
         if (certificateType === 'sector') {
-            if (application.status !== 'sector_approved' && application.status !== 'approved') {
+            if (!['sector_approved', 'approved', 'civil_completed', 'completed'].includes(application.status)) {
                 return res.status(400).json({ message: 'Application must be approved by sector before requesting sector certificate' });
             }
         } else if (certificateType === 'church') {
-            if (application.status !== 'approved') {
+            if (!['approved', 'completed'].includes(application.status)) {
                 return res.status(400).json({ message: 'Application must be approved by church before requesting church certificate' });
+            }
+        } else if (certificateType === 'civil') {
+            if (application.status !== 'civil_completed') {
+                return res.status(400).json({ message: 'Civil marriage must be completed before requesting civil marriage certificate' });
+            }
+        } else if (certificateType === 'religious') {
+            if (application.status !== 'completed') {
+                return res.status(400).json({ message: 'Religious marriage must be completed before requesting religious marriage certificate' });
             }
         }
 
@@ -135,7 +154,14 @@ router.post('/', auth, async (req, res) => {
         }
 
         // Generate request number with type prefix
-        const typePrefix = certificateType === 'sector' ? 'SEC' : 'CHU';
+        let typePrefix;
+        switch (certificateType) {
+            case 'sector': typePrefix = 'SEC'; break;
+            case 'church': typePrefix = 'CHU'; break;
+            case 'civil': typePrefix = 'CIV'; break;
+            case 'religious': typePrefix = 'REL'; break;
+            default: typePrefix = 'CERT';
+        }
         const requestNumber = `${typePrefix}-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
 
         // Create certificate request
@@ -322,48 +348,276 @@ router.get('/:id', auth, async (req, res) => {
 });
 
 // @route   PUT /api/certificate-requests/:id/pay
-// @desc    Mark certificate request as paid
+// @desc    Process payment using ITEC Pay
 // @access  Private
 router.put('/:id/pay', auth, async (req, res) => {
     try {
-        const { paymentReference } = req.body;
+        const { phone, amount } = req.body;
 
-        const certificateRequest = await CertificateRequest.findByPk(req.params.id);
+        const certificateRequest = await CertificateRequest.findByPk(req.params.id, {
+            include: [
+                {
+                    model: MarriageApplication,
+                    as: 'application'
+                }
+            ]
+        });
 
         if (!certificateRequest) {
             return res.status(404).json({ message: 'Certificate request not found' });
         }
 
-        // Check if user owns the request
-        if (certificateRequest.userId !== req.userId) {
-            return res.status(403).json({ message: 'You can only pay for your own certificate requests' });
+        // Check if user owns the request or is a church leader for the same church
+        const isOwner = certificateRequest.userId === req.userId;
+        const isChurchLeader = req.userType === 'church_leader' &&
+            certificateRequest.application &&
+            certificateRequest.application.churchId === req.churchId;
+
+        console.log('🔍 Payment permission check:', {
+            userId: req.userId,
+            userType: req.userType,
+            churchId: req.churchId,
+            certificateUserId: certificateRequest.userId,
+            applicationChurchId: certificateRequest.application?.churchId,
+            isOwner,
+            isChurchLeader
+        });
+
+        if (!isOwner && !isChurchLeader) {
+            return res.status(403).json({ message: 'You can only pay for your own certificate requests or requests from your church' });
         }
 
         if (certificateRequest.paymentStatus === 'paid') {
             return res.status(400).json({ message: 'Certificate request is already paid' });
         }
 
-        await certificateRequest.update({
-            paymentStatus: 'paid',
-            paymentReference,
-            paymentDate: new Date(),
-            status: 'paid'
+        // Validate required fields
+        if (!phone) {
+            return res.status(400).json({ message: 'Phone number is required for payment' });
+        }
+
+        // Use the provided amount or default to 100 RWF
+        const paymentAmount = amount || 100;
+        const paymentReference = `CERT-${certificateRequest.requestNumber}`;
+
+        console.log('🔄 Processing ITEC Pay payment:', {
+            requestId: certificateRequest.id,
+            amount: paymentAmount,
+            phone: phone,
+            reference: paymentReference
         });
 
-        res.json({
-            message: 'Payment recorded successfully',
-            certificateRequest
+        // Initiate payment with ITEC Pay
+        const paymentResult = await paymentService.initiatePayment({
+            amount: paymentAmount,
+            phone: phone,
+            reference: paymentReference
         });
+
+        if (paymentResult.success) {
+            // Check if payment is still processing (waiting for phone confirmation)
+            if (paymentResult.isProcessing) {
+                // Update certificate request with processing status
+                await certificateRequest.update({
+                    paymentStatus: 'processing',
+                    paymentReference: paymentResult.transactionId || paymentReference,
+                    paymentDate: new Date(),
+                    status: 'processing',
+                    paymentMethod: 'itec_pay',
+                    transactionId: paymentResult.transactionId
+                });
+
+                console.log('🔄 Payment initiated, waiting for phone confirmation:', paymentResult.transactionId);
+
+                res.json({
+                    message: 'Payment initiated successfully. Please confirm the payment on your phone.',
+                    success: true,
+                    isProcessing: true,
+                    transactionId: paymentResult.transactionId,
+                    certificateRequest: {
+                        id: certificateRequest.id,
+                        requestNumber: certificateRequest.requestNumber,
+                        paymentStatus: 'processing',
+                        status: 'processing'
+                    }
+                });
+            } else {
+                // Payment completed immediately
+                await certificateRequest.update({
+                    paymentStatus: 'paid',
+                    paymentReference: paymentResult.transactionId || paymentReference,
+                    paymentDate: new Date(),
+                    status: 'paid',
+                    paymentMethod: 'itec_pay',
+                    transactionId: paymentResult.transactionId
+                });
+
+                console.log('✅ Payment completed immediately:', paymentResult.transactionId);
+
+                res.json({
+                    message: 'Payment processed successfully',
+                    success: true,
+                    isProcessing: false,
+                    transactionId: paymentResult.transactionId,
+                    certificateRequest: {
+                        id: certificateRequest.id,
+                        requestNumber: certificateRequest.requestNumber,
+                        paymentStatus: 'paid',
+                        status: 'paid'
+                    }
+                });
+            }
+        } else {
+            console.error('❌ Payment failed:', paymentResult.error);
+
+            // Update with failed status
+            await certificateRequest.update({
+                paymentStatus: 'failed',
+                paymentReference: paymentReference,
+                paymentDate: new Date(),
+                status: 'pending'
+            });
+
+            res.status(400).json({
+                message: 'Payment failed',
+                success: false,
+                error: paymentResult.error
+            });
+        }
+
     } catch (error) {
-        console.error('Pay certificate request error:', error);
-        res.status(500).json({ message: 'Server error' });
+        console.error('Payment processing error:', error);
+        res.status(500).json({
+            message: 'Payment processing failed',
+            error: error.message
+        });
+    }
+});
+
+// Check payment status
+router.put('/:id/check-payment', auth, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const certificateRequest = await CertificateRequest.findByPk(id, {
+            include: [{
+                model: MarriageApplication,
+                as: 'application'
+            }]
+        });
+
+        if (!certificateRequest) {
+            return res.status(404).json({ message: 'Certificate request not found' });
+        }
+
+        // Check if user owns the request or is a church leader for the same church
+        const isOwner = certificateRequest.userId === req.userId;
+        const isChurchLeader = req.userType === 'church_leader' &&
+            certificateRequest.application &&
+            certificateRequest.application.churchId === req.churchId;
+
+        if (!isOwner && !isChurchLeader) {
+            return res.status(403).json({ message: 'You can only check your own certificate requests or requests from your church' });
+        }
+
+        // If payment is processing, check with ITEC Pay
+        if (certificateRequest.paymentStatus === 'processing' && certificateRequest.transactionId) {
+            try {
+                const paymentStatus = await paymentService.checkPaymentStatus(certificateRequest.transactionId);
+
+                if (paymentStatus.success && paymentStatus.status === 'completed') {
+                    // Payment confirmed, update status
+                    await certificateRequest.update({
+                        paymentStatus: 'paid',
+                        status: 'paid',
+                        paymentDate: new Date()
+                    });
+
+                    return res.json({
+                        message: 'Payment confirmed successfully',
+                        success: true,
+                        isProcessing: false,
+                        certificateRequest: {
+                            id: certificateRequest.id,
+                            requestNumber: certificateRequest.requestNumber,
+                            paymentStatus: 'paid',
+                            status: 'paid'
+                        }
+                    });
+                } else if (paymentStatus.success && paymentStatus.status === 'failed') {
+                    // Payment failed
+                    await certificateRequest.update({
+                        paymentStatus: 'failed',
+                        status: 'pending'
+                    });
+
+                    return res.json({
+                        message: 'Payment failed',
+                        success: false,
+                        isProcessing: false,
+                        certificateRequest: {
+                            id: certificateRequest.id,
+                            requestNumber: certificateRequest.requestNumber,
+                            paymentStatus: 'failed',
+                            status: 'pending'
+                        }
+                    });
+                } else {
+                    // Still processing
+                    return res.json({
+                        message: 'Payment is still being processed',
+                        success: true,
+                        isProcessing: true,
+                        certificateRequest: {
+                            id: certificateRequest.id,
+                            requestNumber: certificateRequest.requestNumber,
+                            paymentStatus: 'processing',
+                            status: 'processing'
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Error checking payment status:', error);
+                // Return current status if check fails
+                return res.json({
+                    message: 'Unable to check payment status',
+                    success: true,
+                    isProcessing: true,
+                    certificateRequest: {
+                        id: certificateRequest.id,
+                        requestNumber: certificateRequest.requestNumber,
+                        paymentStatus: certificateRequest.paymentStatus,
+                        status: certificateRequest.status
+                    }
+                });
+            }
+        }
+
+        // Return current status
+        res.json({
+            message: 'Payment status retrieved',
+            success: true,
+            isProcessing: certificateRequest.paymentStatus === 'processing',
+            certificateRequest: {
+                id: certificateRequest.id,
+                requestNumber: certificateRequest.requestNumber,
+                paymentStatus: certificateRequest.paymentStatus,
+                status: certificateRequest.status
+            }
+        });
+
+    } catch (error) {
+        console.error('Payment status check error:', error);
+        res.status(500).json({
+            message: 'Payment status check failed',
+            error: error.message
+        });
     }
 });
 
 // @route   PUT /api/certificate-requests/:id/approve
 // @desc    Approve certificate request
 // @access  Private (Admin only)
-router.put('/:id/approve', auth, authorize('civil_admin', 'super_admin'), async (req, res) => {
+router.put('/:id/approve', auth, authorize('church_leader', 'civil_admin', 'super_admin'), async (req, res) => {
     try {
         const certificateRequest = await CertificateRequest.findByPk(req.params.id, {
             include: [
@@ -402,7 +656,7 @@ router.put('/:id/approve', auth, authorize('civil_admin', 'super_admin'), async 
 // @route   PUT /api/certificate-requests/:id/reject
 // @desc    Reject certificate request
 // @access  Private (Admin only)
-router.put('/:id/reject', auth, authorize('civil_admin', 'super_admin'), async (req, res) => {
+router.put('/:id/reject', auth, authorize('church_leader', 'civil_admin', 'super_admin'), async (req, res) => {
     try {
         const { reason } = req.body;
 
