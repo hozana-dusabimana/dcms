@@ -71,3 +71,8 @@ const MemberNotification = sequelize.define('MemberNotification', {
 
 module.exports = MemberNotification;
 
+
+
+
+
+

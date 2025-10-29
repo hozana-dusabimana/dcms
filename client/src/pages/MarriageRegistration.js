@@ -32,6 +32,7 @@ import { useQuery, useMutation, useQueryClient } from 'react-query';
 import api from '../config/axios';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
+import { getValidationRules } from '../utils/validations';
 
 const steps = [
     'Personal Information',
@@ -54,6 +55,7 @@ const MarriageRegistration = () => {
         trigger,
         getValues,
         reset,
+        watch,
     } = useForm({
         mode: 'onChange',
         key: 'marriage-registration-form', // Add a key to ensure form stability
@@ -81,6 +83,23 @@ const MarriageRegistration = () => {
             sector: '',
         },
     });
+
+    // Watch for changes in date of birth to re-validate ID numbers
+    const groomDateOfBirth = watch('groomDateOfBirth');
+    const brideDateOfBirth = watch('brideDateOfBirth');
+
+    // Re-validate ID numbers when date of birth changes
+    useEffect(() => {
+        if (groomDateOfBirth) {
+            trigger('groomIdNumber');
+        }
+    }, [groomDateOfBirth, trigger]);
+
+    useEffect(() => {
+        if (brideDateOfBirth) {
+            trigger('brideIdNumber');
+        }
+    }, [brideDateOfBirth, trigger]);
 
     // Reset form to ensure clean state
     useEffect(() => {
@@ -337,17 +356,23 @@ const MarriageRegistration = () => {
                             <Controller
                                 name="groomIdNumber"
                                 control={control}
-                                rules={{ required: 'ID number is required' }}
+                                rules={getValidationRules.idNumberWithBirthYear(groomDateOfBirth)}
                                 render={({ field }) => (
                                     <TextField
                                         name={field.name}
                                         value={field.value || ''}
-                                        onChange={field.onChange}
+                                        onChange={(e) => {
+                                            // Only allow digits
+                                            const value = e.target.value.replace(/\D/g, '');
+                                            field.onChange(value);
+                                        }}
                                         onBlur={field.onBlur}
                                         fullWidth
                                         label="ID Number"
+                                        placeholder="Enter 16-digit ID number (first 2 digits = birth year)"
                                         error={!!errors.groomIdNumber}
                                         helperText={errors.groomIdNumber?.message}
+                                        inputProps={{ maxLength: 16 }}
                                     />
                                 )}
                             />
@@ -356,13 +381,14 @@ const MarriageRegistration = () => {
                             <Controller
                                 name="groomDateOfBirth"
                                 control={control}
-                                rules={{ required: 'Date of birth is required' }}
+                                rules={getValidationRules.dateOfBirth()}
                                 render={({ field }) => (
                                     <DatePicker
                                         {...field}
                                         label="Date of Birth"
                                         value={field.value ? dayjs(field.value) : null}
                                         onChange={(date) => field.onChange(date?.toISOString())}
+                                        maxDate={dayjs().subtract(18, 'year')}
                                         slotProps={{
                                             textField: {
                                                 fullWidth: true,
@@ -378,14 +404,21 @@ const MarriageRegistration = () => {
                             <Controller
                                 name="groomPhone"
                                 control={control}
-                                rules={{ required: 'Phone number is required' }}
+                                rules={getValidationRules.phone()}
                                 render={({ field }) => (
                                     <TextField
                                         {...field}
                                         fullWidth
                                         label="Phone Number"
+                                        placeholder="Enter 10 or 13 digit phone number"
                                         error={!!errors.groomPhone}
                                         helperText={errors.groomPhone?.message}
+                                        onChange={(e) => {
+                                            // Only allow digits
+                                            const value = e.target.value.replace(/\D/g, '');
+                                            field.onChange(value);
+                                        }}
+                                        inputProps={{ maxLength: 13 }}
                                     />
                                 )}
                             />
@@ -394,19 +427,14 @@ const MarriageRegistration = () => {
                             <Controller
                                 name="groomEmail"
                                 control={control}
-                                rules={{
-                                    required: 'Email is required',
-                                    pattern: {
-                                        value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                                        message: 'Invalid email address',
-                                    },
-                                }}
+                                rules={getValidationRules.email()}
                                 render={({ field }) => (
                                     <TextField
                                         {...field}
                                         fullWidth
                                         label="Email Address"
                                         type="email"
+                                        placeholder="Enter valid email address"
                                         error={!!errors.groomEmail}
                                         helperText={errors.groomEmail?.message}
                                     />
@@ -457,15 +485,22 @@ const MarriageRegistration = () => {
                             <Controller
                                 name="brideIdNumber"
                                 control={control}
-                                rules={{ required: 'ID number is required' }}
+                                rules={getValidationRules.idNumberWithBirthYear(brideDateOfBirth)}
                                 render={({ field }) => (
                                     <TextField
                                         {...field}
                                         value={field.value || ''}
+                                        onChange={(e) => {
+                                            // Only allow digits
+                                            const value = e.target.value.replace(/\D/g, '');
+                                            field.onChange(value);
+                                        }}
                                         fullWidth
                                         label="ID Number"
+                                        placeholder="Enter 16-digit ID number (first 2 digits = birth year)"
                                         error={!!errors.brideIdNumber}
                                         helperText={errors.brideIdNumber?.message}
+                                        inputProps={{ maxLength: 16 }}
                                     />
                                 )}
                             />
@@ -474,13 +509,14 @@ const MarriageRegistration = () => {
                             <Controller
                                 name="brideDateOfBirth"
                                 control={control}
-                                rules={{ required: 'Date of birth is required' }}
+                                rules={getValidationRules.dateOfBirth()}
                                 render={({ field }) => (
                                     <DatePicker
                                         {...field}
                                         label="Date of Birth"
                                         value={field.value ? dayjs(field.value) : null}
                                         onChange={(date) => field.onChange(date?.toISOString())}
+                                        maxDate={dayjs().subtract(18, 'year')}
                                         slotProps={{
                                             textField: {
                                                 fullWidth: true,
@@ -496,14 +532,21 @@ const MarriageRegistration = () => {
                             <Controller
                                 name="bridePhone"
                                 control={control}
-                                rules={{ required: 'Phone number is required' }}
+                                rules={getValidationRules.phone()}
                                 render={({ field }) => (
                                     <TextField
                                         {...field}
                                         fullWidth
                                         label="Phone Number"
+                                        placeholder="Enter 10 or 13 digit phone number"
                                         error={!!errors.bridePhone}
                                         helperText={errors.bridePhone?.message}
+                                        onChange={(e) => {
+                                            // Only allow digits
+                                            const value = e.target.value.replace(/\D/g, '');
+                                            field.onChange(value);
+                                        }}
+                                        inputProps={{ maxLength: 13 }}
                                     />
                                 )}
                             />
@@ -512,19 +555,14 @@ const MarriageRegistration = () => {
                             <Controller
                                 name="brideEmail"
                                 control={control}
-                                rules={{
-                                    required: 'Email is required',
-                                    pattern: {
-                                        value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                                        message: 'Invalid email address',
-                                    },
-                                }}
+                                rules={getValidationRules.email()}
                                 render={({ field }) => (
                                     <TextField
                                         {...field}
                                         fullWidth
                                         label="Email Address"
                                         type="email"
+                                        placeholder="Enter valid email address"
                                         error={!!errors.brideEmail}
                                         helperText={errors.brideEmail?.message}
                                     />
@@ -541,7 +579,7 @@ const MarriageRegistration = () => {
                             <Controller
                                 name="marriageDate"
                                 control={control}
-                                rules={{ required: 'Marriage date is required' }}
+                                rules={getValidationRules.marriageDate()}
                                 render={({ field }) => (
                                     <LocalizationProvider dateAdapter={AdapterDayjs}>
                                         <DatePicker

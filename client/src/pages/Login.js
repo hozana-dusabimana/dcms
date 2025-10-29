@@ -12,6 +12,7 @@ import {
 } from '@mui/material';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
+import { getValidationRules } from '../utils/validations';
 import { useAuth } from '../contexts/AuthContext';
 
 const Login = () => {
@@ -78,19 +79,14 @@ const Login = () => {
                         <Controller
                             name="email"
                             control={control}
-                            rules={{
-                                required: 'Email is required',
-                                pattern: {
-                                    value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                                    message: 'Invalid email address'
-                                }
-                            }}
+                            rules={getValidationRules.email()}
                             render={({ field }) => (
                                 <TextField
                                     {...field}
                                     fullWidth
                                     label="Email Address"
                                     type="email"
+                                    placeholder="Enter valid email address"
                                     error={!!errors.email}
                                     helperText={errors.email?.message}
                                 />
@@ -100,16 +96,14 @@ const Login = () => {
                         <Controller
                             name="password"
                             control={control}
-                            rules={{
-                                required: 'Password is required',
-                                minLength: { value: 6, message: 'Password must be at least 6 characters' }
-                            }}
+                            rules={getValidationRules.password()}
                             render={({ field }) => (
                                 <TextField
                                     {...field}
                                     fullWidth
                                     label="Password"
                                     type="password"
+                                    placeholder="Enter your password"
                                     error={!!errors.password}
                                     helperText={errors.password?.message}
                                 />

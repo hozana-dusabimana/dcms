@@ -21,6 +21,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { useAuth } from '../contexts/AuthContext';
 import { useQuery } from 'react-query';
 import api from '../config/axios';
+import { getValidationRules } from '../utils/validations';
 
 const Register = () => {
     const [loading, setLoading] = useState(false);
@@ -195,19 +196,14 @@ const Register = () => {
                                 <Controller
                                     name="email"
                                     control={control}
-                                    rules={{
-                                        required: 'Email is required',
-                                        pattern: {
-                                            value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                                            message: 'Invalid email address',
-                                        },
-                                    }}
+                                    rules={getValidationRules.email()}
                                     render={({ field }) => (
                                         <TextField
                                             {...field}
                                             fullWidth
                                             label="Email Address"
                                             type="email"
+                                            placeholder="Enter valid email address"
                                             error={!!errors.email}
                                             helperText={errors.email?.message}
                                         />
@@ -219,13 +215,21 @@ const Register = () => {
                                 <Controller
                                     name="phone"
                                     control={control}
+                                    rules={getValidationRules.phone()}
                                     render={({ field }) => (
                                         <TextField
                                             {...field}
                                             fullWidth
                                             label="Phone Number"
+                                            placeholder="Enter 10 or 13 digit phone number"
                                             error={!!errors.phone}
                                             helperText={errors.phone?.message}
+                                            onChange={(e) => {
+                                                // Only allow digits
+                                                const value = e.target.value.replace(/\D/g, '');
+                                                field.onChange(value);
+                                            }}
+                                            inputProps={{ maxLength: 13 }}
                                         />
                                     )}
                                 />
@@ -235,16 +239,14 @@ const Register = () => {
                                 <Controller
                                     name="password"
                                     control={control}
-                                    rules={{
-                                        required: 'Password is required',
-                                        minLength: { value: 6, message: 'Password must be at least 6 characters' }
-                                    }}
+                                    rules={getValidationRules.password()}
                                     render={({ field }) => (
                                         <TextField
                                             {...field}
                                             fullWidth
                                             label="Password"
                                             type="password"
+                                            placeholder="Enter at least 6 characters"
                                             error={!!errors.password}
                                             helperText={errors.password?.message}
                                         />

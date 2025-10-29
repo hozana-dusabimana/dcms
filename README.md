@@ -107,7 +107,7 @@ A modern, full-stack web application built with React and Node.js for managing m
 6. **Access the application**
    - Frontend: http://localhost:3000
    - Backend API: http://localhost:5000
-   - API Health Check: http://localhost:5000/api/health
+   - API Health Check: https://dcmsbackend.lanari.rw/api/health
 
 ## 🏗️ Project Structure
 
