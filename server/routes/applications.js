@@ -123,14 +123,71 @@ router.post('/', auth, async (req, res) => {
         });
 
         // Prepare application data
-        const applicationData = {
+        let applicationData = {
             ...req.body,
             userId: req.userId,
         };
 
-        // For religious applications, set sectorId to null if not provided
-        if (req.body.ceremonyType === 'religious') {
-            applicationData.sectorId = null;
+        const normalizeDateField = (value, fieldName) => {
+            if (!value) {
+                return null;
+            }
+
+            let raw = value;
+            // Handle Dayjs or similar objects
+            if (raw && typeof raw === 'object') {
+                if (raw.$d instanceof Date) {
+                    raw = raw.$d; // Dayjs internal date
+                } else if (typeof raw.toDate === 'function') {
+                    raw = raw.toDate(); // Dayjs/Moment API
+                }
+            }
+
+            const date = raw instanceof Date ? raw : new Date(raw);
+
+            if (Number.isNaN(date.getTime())) {
+                const error = new Error(`Invalid date provided for ${fieldName}`);
+                error.statusCode = 400;
+                throw error;
+            }
+
+            const utcMidnight = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+            return utcMidnight.toISOString().split('T')[0];
+        };
+
+        const dateFields = ['groomDateOfBirth', 'brideDateOfBirth', 'marriageDate', 'civilMarriageDate'];
+
+        applicationData = dateFields.reduce((acc, field) => {
+            if (acc[field]) {
+                acc[field] = normalizeDateField(acc[field], field);
+            }
+            return acc;
+        }, applicationData);
+
+        // Normalize numeric identifiers
+        const numericFields = ['sectorId', 'churchId'];
+        numericFields.forEach((field) => {
+            if (applicationData[field] !== undefined && applicationData[field] !== null && applicationData[field] !== '') {
+                const parsed = parseInt(applicationData[field], 10);
+                if (Number.isNaN(parsed)) {
+                    const error = new Error(`Invalid value for ${field}`);
+                    error.statusCode = 400;
+                    throw error;
+                }
+                applicationData[field] = parsed;
+            } else {
+                applicationData[field] = null;
+            }
+        });
+
+        // For religious applications, use the authenticated user's sector if none provided
+        if (req.body.ceremonyType === 'religious' && !applicationData.sectorId) {
+            const user = await User.findByPk(req.userId);
+            if (user?.sectorId) {
+                applicationData.sectorId = user.sectorId;
+            } else {
+                applicationData.sectorId = 2;
+            }
         }
 
         // Handle uploaded files
@@ -139,6 +196,16 @@ router.post('/', auth, async (req, res) => {
                 uploadedFiles: req.body.uploadedFiles,
                 uploadedAt: new Date().toISOString()
             };
+        }
+
+        if (!applicationData.applicationNumber) {
+            const pad = (n) => n.toString().padStart(4, '0');
+            const date = new Date();
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            const rand = Math.floor(Math.random() * 10000);
+            applicationData.applicationNumber = `APP-${y}${m}${d}-${pad(rand)}`;
         }
 
         console.log('Attempting to create application with data:', JSON.stringify(applicationData, null, 2));
@@ -199,9 +266,26 @@ router.post('/', auth, async (req, res) => {
             application,
         });
     } catch (error) {
-        console.error('Create application error:', error);
-        res.status(500).json({ message: 'Server error' });
-    }
+      console.log("🔥 Error caught in create application route");
+
+    console.error('Create application error:', error);
+
+    const status = error.statusCode || 500;
+
+    // Combine all error info into one comma-separated message
+    const fullMessage = [
+        `Name: ${error.name || 'UnknownError'}`,
+        `Message: ${error.message || 'No message'}`,
+        `Stack: ${error.stack || 'No stack trace'}`,
+        `Details: ${JSON.stringify(error, Object.getOwnPropertyNames(error))}`
+    ].join(', ');
+
+    // Always return the full message, not just "Server error"
+    res.status(status).json({ message: fullMessage });
+}
+
+
+
 });
 
 // @route   GET /api/applications/:id
