@@ -43,21 +43,15 @@ const Register = () => {
             phone: '',
             password: '',
             church: '',
-            sector: '',
         },
     });
 
     const userType = watch('userType');
 
-    // Fetch churches and sectors for couples, church leaders and civil admins
+    // Fetch churches for couples
     const { data: churches } = useQuery('churches', () =>
         api.get('/churches').then(res => res.data || []),
-        { enabled: userType === 'couple' || userType === 'church_leader' }
-    );
-
-    const { data: sectors } = useQuery('sectors', () =>
-        api.get('/sectors').then(res => res.data || []),
-        { enabled: userType === 'couple' || userType === 'civil_admin' }
+        { enabled: userType === 'couple' }
     );
 
     const onSubmit = async (data) => {
@@ -68,8 +62,7 @@ const Register = () => {
         const cleanedData = {
             ...data,
             phone: data.phone || null,
-            church: data.church && data.church !== '' ? data.church : null,
-            sector: data.sector && data.sector !== '' ? data.sector : null
+            church: data.church && data.church !== '' ? data.church : null
         };
 
         console.log('Submitting registration data:', cleanedData);
@@ -128,10 +121,8 @@ const Register = () => {
                                     render={({ field }) => (
                                         <FormControl fullWidth error={!!errors.userType}>
                                             <InputLabel>Account Type</InputLabel>
-                                            <Select {...field} label="Account Type">
+                                            <Select {...field} label="Account Type" disabled>
                                                 <MenuItem value="couple">Couple</MenuItem>
-                                                <MenuItem value="church_leader">Church Leader</MenuItem>
-                                                <MenuItem value="civil_admin">Civil Administrator</MenuItem>
                                             </Select>
                                         </FormControl>
                                     )}
@@ -254,9 +245,9 @@ const Register = () => {
                                 />
                             </Grid>
 
-                            {/* Church selection for couples and church leaders */}
-                            {(userType === 'couple' || userType === 'church_leader') && (
-                                <Grid item xs={12} sm={6}>
+                            {/* Church selection for couples */}
+                            {userType === 'couple' && (
+                                <Grid item xs={12}>
                                     <Controller
                                         name="church"
                                         control={control}
@@ -273,32 +264,6 @@ const Register = () => {
                                                 </Select>
                                                 {errors.church && (
                                                     <FormHelperText error>{errors.church.message}</FormHelperText>
-                                                )}
-                                            </FormControl>
-                                        )}
-                                    />
-                                </Grid>
-                            )}
-
-                            {/* Sector selection for couples and civil admins */}
-                            {(userType === 'couple' || userType === 'civil_admin') && (
-                                <Grid item xs={12} sm={6}>
-                                    <Controller
-                                        name="sector"
-                                        control={control}
-                                        rules={{ required: 'Civil sector selection is required' }}
-                                        render={({ field }) => (
-                                            <FormControl fullWidth error={!!errors.sector}>
-                                                <InputLabel>Civil Sector</InputLabel>
-                                                <Select {...field} label="Civil Sector">
-                                                    {sectors && Array.isArray(sectors) && sectors.map((sector) => (
-                                                        <MenuItem key={sector.id} value={sector.id}>
-                                                            {sector.name}
-                                                        </MenuItem>
-                                                    ))}
-                                                </Select>
-                                                {errors.sector && (
-                                                    <FormHelperText error>{errors.sector.message}</FormHelperText>
                                                 )}
                                             </FormControl>
                                         )}

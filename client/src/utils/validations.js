@@ -78,7 +78,7 @@ export const validateIdNumber = (idNumber) => {
 
 /**
  * Validates ID number format and birth year consistency
- * Must be exactly 16 digits and first two digits should match birth year
+ * Must be exactly 16 digits and positions 2-5 (1-indexed) should match birth year
  * @param {string} idNumber - ID number to validate
  * @param {string|Date} dateOfBirth - Date of birth to validate against
  * @returns {object} - Validation result with isValid and message
@@ -101,13 +101,14 @@ export const validateIdNumberWithBirthYear = (idNumber, dateOfBirth) => {
     }
 
     const birthYear = birthDate.getFullYear();
-    const idYearDigits = idNumber.substring(0, 2);
+    // Extract year from positions 2-5 (1-indexed), which is substring(1, 5) in 0-indexed
+    const idYearDigits = idNumber.substring(1, 5);
 
-    // Convert ID year digits to actual year (assuming 20xx format)
-    const idYear = 2000 + parseInt(idYearDigits);
+    // Parse the 4-digit year directly from the ID number
+    const idYear = parseInt(idYearDigits);
 
-    // Check if the years match (allow some tolerance for different ID formats)
-    if (Math.abs(idYear - birthYear) <= 1) {
+    // Check if the years match exactly
+    if (idYear === birthYear) {
         return { isValid: true, message: '' };
     } else {
         return {

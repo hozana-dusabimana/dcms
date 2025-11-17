@@ -38,7 +38,6 @@ router.get('/', auth, async (req, res) => {
         console.log('Current user details:', {
             id: user.id,
             userType: user.userType,
-            sectorId: user.sectorId,
             churchId: user.churchId
         });
 
@@ -50,10 +49,6 @@ router.get('/', auth, async (req, res) => {
             query.churchId = user.churchId;
             query.ceremonyType = 'religious';
             // Remove status filter to show all applications including pending ones
-        } else if (user.userType === 'civil_admin') {
-            // Civil admins can see all applications in their sector for tracking and management
-            query.sectorId = user.sectorId;
-            // Remove status filter to show all applications including approved ones
         }
 
         // Add search functionality
@@ -165,7 +160,7 @@ router.post('/', auth, async (req, res) => {
         }, applicationData);
 
         // Normalize numeric identifiers
-        const numericFields = ['sectorId', 'churchId'];
+        const numericFields = ['churchId'];
         numericFields.forEach((field) => {
             if (applicationData[field] !== undefined && applicationData[field] !== null && applicationData[field] !== '') {
                 const parsed = parseInt(applicationData[field], 10);
@@ -180,15 +175,16 @@ router.post('/', auth, async (req, res) => {
             }
         });
 
-        // For religious applications, use the authenticated user's sector if none provided
-        if (req.body.ceremonyType === 'religious' && !applicationData.sectorId) {
-            const user = await User.findByPk(req.userId);
-            if (user?.sectorId) {
-                applicationData.sectorId = user.sectorId;
-            } else {
-                applicationData.sectorId = 2;
-            }
+        // Ensure church is required for religious applications
+        if (!applicationData.churchId) {
+            const error = new Error('Church selection is required');
+            error.statusCode = 400;
+            throw error;
         }
+
+        // Set ceremony type to religious and remove sector
+        applicationData.ceremonyType = 'religious';
+        applicationData.sectorId = null;
 
         // Handle uploaded files
         if (req.body.uploadedFiles && Array.isArray(req.body.uploadedFiles)) {
@@ -266,23 +262,23 @@ router.post('/', auth, async (req, res) => {
             application,
         });
     } catch (error) {
-      console.log("🔥 Error caught in create application route");
+        console.log("🔥 Error caught in create application route");
 
-    console.error('Create application error:', error);
+        console.error('Create application error:', error);
 
-    const status = error.statusCode || 500;
+        const status = error.statusCode || 500;
 
-    // Combine all error info into one comma-separated message
-    const fullMessage = [
-        `Name: ${error.name || 'UnknownError'}`,
-        `Message: ${error.message || 'No message'}`,
-        `Stack: ${error.stack || 'No stack trace'}`,
-        `Details: ${JSON.stringify(error, Object.getOwnPropertyNames(error))}`
-    ].join(', ');
+        // Combine all error info into one comma-separated message
+        const fullMessage = [
+            `Name: ${error.name || 'UnknownError'}`,
+            `Message: ${error.message || 'No message'}`,
+            `Stack: ${error.stack || 'No stack trace'}`,
+            `Details: ${JSON.stringify(error, Object.getOwnPropertyNames(error))}`
+        ].join(', ');
 
-    // Always return the full message, not just "Server error"
-    res.status(status).json({ message: fullMessage });
-}
+        // Always return the full message, not just "Server error"
+        res.status(status).json({ message: fullMessage });
+    }
 
 
 
@@ -493,17 +489,9 @@ router.put('/:id/church-approve', auth, authorize('church_leader'), async (req, 
             return res.status(403).json({ message: 'You can only approve applications in your church' });
         }
 
-        // For religious applications, church leaders can approve directly without sector approval
-        if (application.ceremonyType === 'religious') {
-            // Allow church leaders to approve religious applications directly from pending status
-            if (!['pending', 'under_review', 'sector_approved'].includes(application.status)) {
-                return res.status(400).json({ message: 'Application is not in a state that can be approved' });
-            }
-        } else {
-            // For non-religious applications, require sector approval
-            if (application.status !== 'sector_approved') {
-                return res.status(400).json({ message: 'Application must be approved by sector before church approval' });
-            }
+        // Church leaders can approve applications directly from pending status
+        if (!['pending', 'under_review'].includes(application.status)) {
+            return res.status(400).json({ message: 'Application is not in a state that can be approved' });
         }
 
         await application.update({
@@ -523,7 +511,7 @@ router.put('/:id/church-approve', auth, authorize('church_leader'), async (req, 
                     applicationId: application.applicationNumber,
                     approvedDate: new Date().toLocaleDateString(),
                     status: 'approved',
-                    approvalType: application.ceremonyType === 'religious' ? 'Church' : 'Sector and Church'
+                    approvalType: 'Church'
                 });
 
                 // Send email notification
@@ -545,7 +533,7 @@ router.put('/:id/church-approve', auth, authorize('church_leader'), async (req, 
                         applicationId: application.id,
                         applicationNumber: application.applicationNumber,
                         status: 'approved',
-                        previousStatus: application.ceremonyType === 'religious' ? 'pending' : 'sector_approved'
+                        previousStatus: 'pending'
                     }
                 });
 
@@ -585,17 +573,9 @@ router.put('/:id/church-reject', auth, authorize('church_leader'), async (req, r
             return res.status(403).json({ message: 'You can only reject applications in your church' });
         }
 
-        // For religious applications, church leaders can reject directly without sector approval
-        if (application.ceremonyType === 'religious') {
-            // Allow church leaders to reject religious applications directly from pending status
-            if (!['pending', 'under_review', 'sector_approved'].includes(application.status)) {
-                return res.status(400).json({ message: 'Application is not in a state that can be rejected' });
-            }
-        } else {
-            // For non-religious applications, require sector approval
-            if (application.status !== 'sector_approved') {
-                return res.status(400).json({ message: 'Application must be approved by sector before church rejection' });
-            }
+        // Church leaders can reject applications directly from pending status
+        if (!['pending', 'under_review'].includes(application.status)) {
+            return res.status(400).json({ message: 'Application is not in a state that can be rejected' });
         }
 
         await application.update({
@@ -638,7 +618,7 @@ router.put('/:id/church-reject', auth, authorize('church_leader'), async (req, r
                         applicationId: application.id,
                         applicationNumber: application.applicationNumber,
                         status: 'rejected',
-                        previousStatus: application.ceremonyType === 'religious' ? 'pending' : 'sector_approved',
+                        previousStatus: 'pending',
                         reason: reason
                     }
                 });
@@ -678,9 +658,9 @@ router.put('/:id/complete', auth, authorize('church_leader'), async (req, res) =
             return res.status(403).json({ message: 'You can only complete marriages in your church' });
         }
 
-        // Check if application is approved or civil completed
-        if (!['approved', 'civil_completed'].includes(application.status)) {
-            return res.status(400).json({ message: 'Application must be approved or civil completed before marking as religious completed' });
+        // Check if application is approved
+        if (application.status !== 'approved') {
+            return res.status(400).json({ message: 'Application must be approved before marking as completed' });
         }
 
         await application.update({

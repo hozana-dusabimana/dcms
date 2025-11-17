@@ -49,7 +49,7 @@ const CertificateRequest = () => {
     const [requestDialogOpen, setRequestDialogOpen] = useState(false);
     const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
     const [selectedApplication, setSelectedApplication] = useState(null);
-    const [selectedCertificateType, setSelectedCertificateType] = useState('sector');
+    const [selectedCertificateType, setSelectedCertificateType] = useState('church');
     const [phoneNumber, setPhoneNumber] = useState('');
 
     // Fetch applications for certificate requests
@@ -83,7 +83,7 @@ const CertificateRequest = () => {
             onSuccess: () => {
                 queryClient.invalidateQueries('certificate-requests');
                 setRequestDialogOpen(false);
-                setSelectedCertificateType('sector');
+                setSelectedCertificateType('church');
                 toast.success('Certificate request created successfully');
             },
             onError: (error) => {
@@ -203,9 +203,7 @@ const CertificateRequest = () => {
     const getAvailableCertificateTypes = (application) => {
         const types = [];
 
-        if (['sector_approved', 'approved', 'civil_completed', 'completed'].includes(application.status)) {
-            types.push({ value: 'sector', label: 'Sector Certificate (Civil)' });
-        }
+        // Removed sector certificate option
 
         if (['approved', 'completed'].includes(application.status)) {
             types.push({ value: 'church', label: 'Church Certificate (Religious)' });
@@ -419,8 +417,20 @@ const CertificateRequest = () => {
                                                 </TableCell>
                                                 <TableCell>
                                                     <Chip
-                                                        label={request.certificateType === 'sector' ? 'Sector (Civil)' : 'Church (Religious)'}
-                                                        color={request.certificateType === 'sector' ? 'primary' : 'secondary'}
+                                                        label={
+                                                            request.certificateType === 'sector' ? 'Sector (Civil)' :
+                                                            request.certificateType === 'church' ? 'Church (Religious)' :
+                                                            request.certificateType === 'civil' ? 'Civil Marriage' :
+                                                            request.certificateType === 'religious' ? 'Religious Marriage' :
+                                                            request.certificateType
+                                                        }
+                                                        color={
+                                                            request.certificateType === 'sector' ? 'primary' :
+                                                            request.certificateType === 'church' ? 'secondary' :
+                                                            request.certificateType === 'civil' ? 'info' :
+                                                            request.certificateType === 'religious' ? 'success' :
+                                                            'default'
+                                                        }
                                                         size="small"
                                                     />
                                                 </TableCell>

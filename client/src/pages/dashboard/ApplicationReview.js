@@ -318,24 +318,42 @@ const ApplicationReview = () => {
                                     </Grid>
 
                                     {/* Documents */}
-                                    {application.documents && application.documents.length > 0 && (
-                                        <Grid item xs={12}>
-                                            <Typography variant="subtitle1" gutterBottom color="primary">
-                                                Submitted Documents
-                                            </Typography>
-                                            <List dense>
-                                                {application.documents.map((doc, index) => (
-                                                    <ListItem key={index}>
-                                                        <ListItemIcon><DocumentIcon /></ListItemIcon>
-                                                        <ListItemText
-                                                            primary={doc.name}
-                                                            secondary={doc.type}
-                                                        />
-                                                    </ListItem>
-                                                ))}
-                                            </List>
-                                        </Grid>
-                                    )}
+                                    {(() => {
+                                        // Handle documents - could be string (JSON) or object
+                                        let documents = null;
+                                        if (application.documents) {
+                                            if (typeof application.documents === 'string') {
+                                                try {
+                                                    documents = JSON.parse(application.documents);
+                                                } catch (e) {
+                                                    documents = null;
+                                                }
+                                            } else {
+                                                documents = application.documents;
+                                            }
+                                        }
+                                        
+                                        const uploadedFiles = documents?.uploadedFiles || [];
+                                        
+                                        return uploadedFiles.length > 0 ? (
+                                            <Grid item xs={12}>
+                                                <Typography variant="subtitle1" gutterBottom color="primary">
+                                                    Submitted Documents
+                                                </Typography>
+                                                <List dense>
+                                                    {uploadedFiles.map((doc, index) => (
+                                                        <ListItem key={index}>
+                                                            <ListItemIcon><DocumentIcon /></ListItemIcon>
+                                                            <ListItemText
+                                                                primary={doc.originalName || doc.filename || `Document ${index + 1}`}
+                                                                secondary={doc.category ? doc.category.replace(/_/g, ' ') : 'Document'}
+                                                            />
+                                                        </ListItem>
+                                                    ))}
+                                                </List>
+                                            </Grid>
+                                        ) : null;
+                                    })()}
                                 </Grid>
                             </CardContent>
                         </Card>

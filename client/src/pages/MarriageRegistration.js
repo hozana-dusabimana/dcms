@@ -19,9 +19,15 @@ import {
     Radio,
     Alert,
     CircularProgress,
+    Chip,
+    IconButton,
+    LinearProgress,
 } from '@mui/material';
 import {
     CheckCircle as CheckCircleIcon,
+    CloudUpload as CloudUploadIcon,
+    Delete as DeleteIcon,
+    AttachFile as AttachFileIcon,
 } from '@mui/icons-material';
 import { useForm, Controller } from 'react-hook-form';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
@@ -41,9 +47,107 @@ const steps = [
     'Review & Submit',
 ];
 
+// Document Upload Field Component
+const DocumentUploadField = ({ label, category, files, onUpload, onRemove, required = false }) => {
+    const [isDragging, setIsDragging] = useState(false);
+    const fileInputRef = React.useRef(null);
+    const existingFile = files.find(f => f.category === category);
+
+    const handleFileSelect = (file) => {
+        if (file) {
+            onUpload(file, category);
+        }
+    };
+
+    const handleDrop = (e) => {
+        e.preventDefault();
+        setIsDragging(false);
+        const file = e.dataTransfer.files[0];
+        if (file) {
+            handleFileSelect(file);
+        }
+    };
+
+    const handleDragOver = (e) => {
+        e.preventDefault();
+        setIsDragging(true);
+    };
+
+    const handleDragLeave = () => {
+        setIsDragging(false);
+    };
+
+    return (
+        <Box>
+            <Typography variant="body2" gutterBottom sx={{ fontWeight: 500 }}>
+                {label} {required && <span style={{ color: 'red' }}>*</span>}
+            </Typography>
+            <Box
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                sx={{
+                    border: `2px dashed ${isDragging ? 'primary.main' : 'grey.300'}`,
+                    borderRadius: 2,
+                    p: 2,
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    bgcolor: isDragging ? 'action.hover' : 'background.paper',
+                    transition: 'all 0.3s',
+                    '&:hover': {
+                        borderColor: 'primary.main',
+                        bgcolor: 'action.hover',
+                    },
+                }}
+                onClick={() => fileInputRef.current?.click()}
+            >
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    style={{ display: 'none' }}
+                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                    onChange={(e) => handleFileSelect(e.target.files[0])}
+                />
+                {existingFile ? (
+                    <Box>
+                        <AttachFileIcon sx={{ fontSize: 40, color: 'success.main', mb: 1 }} />
+                        <Typography variant="body2" color="success.main">
+                            {existingFile.originalName}
+                        </Typography>
+                        <Button
+                            size="small"
+                            color="error"
+                            startIcon={<DeleteIcon />}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onRemove(existingFile);
+                            }}
+                            sx={{ mt: 1 }}
+                        >
+                            Remove
+                        </Button>
+                    </Box>
+                ) : (
+                    <Box>
+                        <CloudUploadIcon sx={{ fontSize: 40, color: 'text.secondary', mb: 1 }} />
+                        <Typography variant="body2" color="text.secondary">
+                            Click to upload or drag and drop
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                            PDF, JPG, PNG, DOC, DOCX (Max 10MB)
+                        </Typography>
+                    </Box>
+                )}
+            </Box>
+        </Box>
+    );
+};
+
 const MarriageRegistration = () => {
     const [activeStep, setActiveStep] = useState(0);
     const [loading, setLoading] = useState(false);
+    const [uploadedFiles, setUploadedFiles] = useState([]);
+    const [uploading, setUploading] = useState(false);
 
     const { user } = useAuth();
     const queryClient = useQueryClient();
@@ -78,9 +182,8 @@ const MarriageRegistration = () => {
             brideAddress: '',
             // Marriage details
             marriageDate: dayjs().add(30, 'day'),
-            ceremonyType: 'both',
+            ceremonyType: 'religious',
             church: '',
-            sector: '',
         },
     });
 
@@ -122,10 +225,10 @@ const MarriageRegistration = () => {
             brideAddress: '',
             // Marriage details
             marriageDate: dayjs().add(30, 'day'),
-            ceremonyType: 'both',
+            ceremonyType: 'religious',
             church: '',
-            sector: '',
         });
+        setUploadedFiles([]);
     }, [reset]);
 
     // Debug: Log form values when step changes
@@ -139,13 +242,9 @@ const MarriageRegistration = () => {
         console.log('Groom idNumber value:', currentValues.groomIdNumber);
     }, [activeStep, getValues]);
 
-    // Fetch churches and sectors
+    // Fetch churches
     const { data: churches, isLoading: churchesLoading, error: churchesError } = useQuery('churches', () =>
         api.get('/churches').then(res => res.data || [])
-    );
-
-    const { data: sectors, isLoading: sectorsLoading, error: sectorsError } = useQuery('sectors', () =>
-        api.get('/sectors').then(res => res.data || [])
     );
 
 
@@ -156,6 +255,7 @@ const MarriageRegistration = () => {
             onSuccess: () => {
                 toast.success('Marriage application submitted successfully!');
                 queryClient.invalidateQueries('applications');
+                setUploadedFiles([]); // Clear uploaded files after successful submission
                 setActiveStep(3);
             },
             onError: (error) => {
@@ -182,13 +282,65 @@ const MarriageRegistration = () => {
         setActiveStep((prevStep) => prevStep - 1);
     };
 
+    const handleFileUpload = async (file, category) => {
+        if (!file) return;
+
+        // Validate file size (10MB)
+        if (file.size > 10 * 1024 * 1024) {
+            toast.error('File size must be less than 10MB');
+            return;
+        }
+
+        // Validate file type
+        const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+        if (!allowedTypes.includes(file.type)) {
+            toast.error('Invalid file type. Please upload PDF, JPG, PNG, DOC, or DOCX files');
+            return;
+        }
+
+        setUploading(true);
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const response = await api.post('/upload', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            });
+
+            const uploadedFile = {
+                ...response.data.file,
+                category: category,
+                originalName: file.name,
+            };
+
+            setUploadedFiles((prev) => [...prev, uploadedFile]);
+            toast.success('File uploaded successfully');
+        } catch (error) {
+            console.error('Upload error:', error);
+            toast.error(error.response?.data?.message || 'Failed to upload file');
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const handleFileRemove = (fileToRemove) => {
+        setUploadedFiles((prev) => prev.filter((file) => file !== fileToRemove));
+        toast.success('File removed');
+    };
+
     const getFieldsForStep = (step) => {
         switch (step) {
             case 0:
                 return ['groomFirstName', 'groomLastName', 'groomIdNumber', 'groomDateOfBirth', 'groomPhone', 'groomEmail', 'brideFirstName', 'brideLastName', 'brideIdNumber', 'brideDateOfBirth', 'bridePhone', 'brideEmail'];
             case 1:
-                return ['marriageDate', 'ceremonyType', 'church', 'sector'];
+                return ['marriageDate', 'church'];
             case 2:
+                // Validate that at least marriage certificate is uploaded
+                if (uploadedFiles.filter(f => f.category === 'marriage_certificate').length === 0) {
+                    return ['documents'];
+                }
                 return [];
             default:
                 return [];
@@ -257,15 +409,22 @@ const MarriageRegistration = () => {
 
                 // Marriage details
                 marriageDate: data.marriageDate.toISOString().split('T')[0], // Format as YYYY-MM-DD
-                ceremonyType: data.ceremonyType,
-                sectorId: data.sector,
+                ceremonyType: 'religious',
                 churchId: data.church || null,
 
                 // Application metadata
                 userId: user.id,
                 status: 'pending',
                 civilStatus: 'pending',
-                churchStatus: 'pending'
+                churchStatus: 'pending',
+                // Include uploaded files
+                uploadedFiles: uploadedFiles.map(file => ({
+                    filename: file.filename,
+                    originalName: file.originalName,
+                    path: file.path,
+                    size: file.size,
+                    category: file.category
+                }))
             };
 
             // Debug: Log the application data being sent
@@ -292,9 +451,16 @@ const MarriageRegistration = () => {
                 return;
             }
 
-            if (!data.sector) {
-                console.error('Missing required sector');
-                toast.error('Please select a civil sector');
+            if (!data.church) {
+                console.error('Missing required church');
+                toast.error('Please select a church');
+                return;
+            }
+
+            // Validate that civil marriage certificate is uploaded
+            const marriageCert = uploadedFiles.find(f => f.category === 'marriage_certificate');
+            if (!marriageCert) {
+                toast.error('Please upload your civil marriage certificate (Restation de Marriage)');
                 return;
             }
 
@@ -369,7 +535,7 @@ const MarriageRegistration = () => {
                                         onBlur={field.onBlur}
                                         fullWidth
                                         label="ID Number"
-                                        placeholder="Enter 16-digit ID number (first 2 digits = birth year)"
+                                        placeholder="Enter 16-digit ID number (positions 2-5 = birth year)"
                                         error={!!errors.groomIdNumber}
                                         helperText={errors.groomIdNumber?.message}
                                         inputProps={{ maxLength: 16 }}
@@ -497,7 +663,7 @@ const MarriageRegistration = () => {
                                         }}
                                         fullWidth
                                         label="ID Number"
-                                        placeholder="Enter 16-digit ID number (first 2 digits = birth year)"
+                                        placeholder="Enter 16-digit ID number (positions 2-5 = birth year)"
                                         error={!!errors.brideIdNumber}
                                         helperText={errors.brideIdNumber?.message}
                                         inputProps={{ maxLength: 16 }}
@@ -600,80 +766,17 @@ const MarriageRegistration = () => {
                         </Grid>
                         <Grid item xs={12}>
                             <Controller
-                                name="ceremonyType"
-                                control={control}
-                                render={({ field }) => (
-                                    <FormControl fullWidth>
-                                        <Typography variant="subtitle1" gutterBottom>
-                                            Ceremony Type
-                                        </Typography>
-                                        <RadioGroup {...field}>
-                                            <FormControlLabel
-                                                value="civil"
-                                                control={<Radio />}
-                                                label="Civil Ceremony Only"
-                                            />
-                                            <FormControlLabel
-                                                value="religious"
-                                                control={<Radio />}
-                                                label="Religious Ceremony Only"
-                                            />
-                                            <FormControlLabel
-                                                value="both"
-                                                control={<Radio />}
-                                                label="Both Civil and Religious"
-                                            />
-                                        </RadioGroup>
-                                    </FormControl>
-                                )}
-                            />
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                            <Controller
-                                name="sector"
-                                control={control}
-                                rules={{ required: 'Civil sector is required' }}
-                                render={({ field }) => (
-                                    <FormControl fullWidth error={!!errors.sector}>
-                                        <InputLabel>Civil Sector</InputLabel>
-                                        <Select
-                                            {...field}
-                                            label="Civil Sector"
-                                            disabled={sectorsLoading}
-                                        >
-                                            {sectorsLoading ? (
-                                                <MenuItem disabled>Loading sectors...</MenuItem>
-                                            ) : sectorsError ? (
-                                                <MenuItem disabled>Error loading sectors</MenuItem>
-                                            ) : sectors && Array.isArray(sectors) ? (
-                                                sectors.map((sector) => (
-                                                    <MenuItem key={sector.id} value={sector.id}>
-                                                        {sector.name}
-                                                    </MenuItem>
-                                                ))
-                                            ) : (
-                                                <MenuItem disabled>No sectors available</MenuItem>
-                                            )}
-                                        </Select>
-                                    </FormControl>
-                                )}
-                            />
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                            <Controller
                                 name="church"
                                 control={control}
+                                rules={{ required: 'Church selection is required' }}
                                 render={({ field }) => (
-                                    <FormControl fullWidth>
-                                        <InputLabel>Church (Optional)</InputLabel>
+                                    <FormControl fullWidth error={!!errors.church}>
+                                        <InputLabel>Church</InputLabel>
                                         <Select
                                             {...field}
-                                            label="Church (Optional)"
+                                            label="Church"
                                             disabled={churchesLoading}
                                         >
-                                            <MenuItem value="">
-                                                <em>None</em>
-                                            </MenuItem>
                                             {churchesLoading ? (
                                                 <MenuItem disabled>Loading churches...</MenuItem>
                                             ) : churchesError ? (
@@ -688,6 +791,11 @@ const MarriageRegistration = () => {
                                                 <MenuItem disabled>No churches available</MenuItem>
                                             )}
                                         </Select>
+                                        {errors.church && (
+                                            <Typography variant="caption" color="error" sx={{ mt: 0.5, ml: 1.75 }}>
+                                                {errors.church.message}
+                                            </Typography>
+                                        )}
                                     </FormControl>
                                 )}
                             />
@@ -698,20 +806,52 @@ const MarriageRegistration = () => {
             case 2:
                 return (
                     <Box>
-                        <Alert severity="info" sx={{ mb: 3 }}>
-                            Document upload functionality will be implemented in the next step.
-                            You can upload required documents after submitting your application.
-                        </Alert>
-                        <Typography variant="body1" color="text.secondary">
-                            Required documents may include:
+                        <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
+                            Upload Civil Marriage Certificate
                         </Typography>
-                        <ul>
-                            <li>Birth certificates</li>
-                            <li>National ID cards</li>
-                            <li>Baptism certificates (for religious ceremonies)</li>
-                            <li>Divorce certificates (if applicable)</li>
-                            <li>Death certificates of previous spouse (if applicable)</li>
-                        </ul>
+                        <Alert severity="info" sx={{ mb: 3 }}>
+                            Please upload your civil marriage certificate (Restation de Marriage). Supported formats: PDF, JPG, PNG, DOC, DOCX (Max 10MB)
+                        </Alert>
+
+                        <Box sx={{ maxWidth: 600, mx: 'auto' }}>
+                            <DocumentUploadField
+                                label="Civil Marriage Certificate (Restation de Marriage)"
+                                category="marriage_certificate"
+                                files={uploadedFiles}
+                                onUpload={handleFileUpload}
+                                onRemove={handleFileRemove}
+                                required
+                            />
+                        </Box>
+
+                        {uploading && (
+                            <Box sx={{ mt: 3, maxWidth: 600, mx: 'auto' }}>
+                                <LinearProgress />
+                                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block', textAlign: 'center' }}>
+                                    Uploading file...
+                                </Typography>
+                            </Box>
+                        )}
+
+                        {uploadedFiles.length > 0 && (
+                            <Box sx={{ mt: 3, maxWidth: 600, mx: 'auto' }}>
+                                <Alert severity="success" sx={{ mb: 2 }}>
+                                    Civil marriage certificate uploaded successfully!
+                                </Alert>
+                                <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1 }}>
+                                    {uploadedFiles.map((file, index) => (
+                                        <Chip
+                                            key={index}
+                                            icon={<AttachFileIcon />}
+                                            label={file.originalName}
+                                            onDelete={() => handleFileRemove(file)}
+                                            color="success"
+                                            variant="outlined"
+                                        />
+                                    ))}
+                                </Box>
+                            </Box>
+                        )}
                     </Box>
                 );
 
@@ -786,7 +926,7 @@ const MarriageRegistration = () => {
                             <Button
                                 variant="contained"
                                 onClick={activeStep === 2 ? handleSubmit(onSubmit) : handleNext}
-                                disabled={loading}
+                                disabled={loading || uploading}
                             >
                                 {loading ? (
                                     <CircularProgress size={24} />
