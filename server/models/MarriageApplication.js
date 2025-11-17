@@ -107,7 +107,7 @@ const MarriageApplication = sequelize.define('MarriageApplication', {
     },
     sectorId: {
         type: DataTypes.INTEGER,
-        allowNull: false,
+        allowNull: true, // Changed to true for religious applications
         field: 'sector_id',
         references: {
             model: 'sectors',

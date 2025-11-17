@@ -97,7 +97,7 @@
 ### **Application URLs**
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:5000
-- **API Health**: http://localhost:5000/api/health
+- **API Health**: https://dcmsbackend.lanari.rw/api/health
 
 ### **Key Endpoints**
 - **Health Check**: `GET /api/health`
@@ -292,7 +292,7 @@ The application is ready for development, testing, and can be easily deployed to
 ### **Application URLs**
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:5000
-- **API Health**: http://localhost:5000/api/health
+- **API Health**: https://dcmsbackend.lanari.rw/api/health
 
 ### **Key Endpoints**
 - **Health Check**: `GET /api/health`

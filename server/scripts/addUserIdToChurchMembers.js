@@ -29,3 +29,8 @@ async function addUserIdToChurchMembers() {
 
 addUserIdToChurchMembers();
 
+
+
+
+
+

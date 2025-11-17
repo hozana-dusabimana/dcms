@@ -12,8 +12,7 @@
         "build:server": "cd server && npm install",
         "install-all": "npm install && cd server && npm install && cd ../client && npm install",
         "start": "cd server && npm start",
-        "setup": "node setup.js",
-        "postinstall": "npm run install-all"
+        "setup": "node setup.js"
     },
     "keywords": [
         "marriage",

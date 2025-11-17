@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Oct 24, 2025 at 05:24 PM
+-- Generation Time: Nov 17, 2025 at 01:51 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -45,15 +45,20 @@ CREATE TABLE `certificate_requests` (
   `created_at` datetime NOT NULL,
   `updated_at` datetime NOT NULL,
   `notes` text DEFAULT NULL,
-  `certificate_type` enum('sector','church') NOT NULL DEFAULT 'sector'
+  `certificate_type` enum('sector','church','civil','religious') NOT NULL DEFAULT 'sector',
+  `payment_method` varchar(50) DEFAULT NULL,
+  `transaction_id` varchar(100) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `certificate_requests`
 --
 
-INSERT INTO `certificate_requests` (`id`, `application_id`, `user_id`, `request_number`, `status`, `payment_status`, `payment_reference`, `payment_date`, `approved_at`, `approved_by`, `issued_at`, `issued_by`, `certificate_path`, `rejection_reason`, `created_at`, `updated_at`, `notes`, `certificate_type`) VALUES
-(1, 5, 65, 'CERT-1761303702122-573RG', 'approved', 'paid', '0791724884', '2025-10-24 11:07:00', '2025-10-24 11:27:21', 63, NULL, NULL, NULL, NULL, '2025-10-24 11:01:42', '2025-10-24 11:27:21', NULL, 'sector');
+INSERT INTO `certificate_requests` (`id`, `application_id`, `user_id`, `request_number`, `status`, `payment_status`, `payment_reference`, `payment_date`, `approved_at`, `approved_by`, `issued_at`, `issued_by`, `certificate_path`, `rejection_reason`, `created_at`, `updated_at`, `notes`, `certificate_type`, `payment_method`, `transaction_id`) VALUES
+(10, 6, 70, 'SEC-1761479486717-YKZT9', 'approved', 'paid', 'DEV-1761479531426', '2025-10-26 11:52:11', '2025-11-17 12:47:20', 66, NULL, NULL, NULL, NULL, '2025-10-26 11:51:26', '2025-11-17 12:47:20', NULL, 'sector', 'itec_pay', 'DEV-1761479531426'),
+(11, 6, 70, 'REL-1761479657465-01CLW', 'pending', 'pending', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '2025-10-26 11:54:17', '2025-10-26 11:54:17', NULL, 'religious', NULL, NULL),
+(12, 8, 71, 'REL-1761764458836-FNIO1', 'pending', 'pending', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '2025-10-29 19:00:58', '2025-10-29 19:00:58', NULL, 'religious', NULL, NULL),
+(13, 10, 74, 'CHU-1763383561213-OBBXF', 'pending', 'pending', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '2025-11-17 12:46:01', '2025-11-17 12:46:01', NULL, 'church', NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -218,8 +223,8 @@ CREATE TABLE `marriage_applications` (
   `marriage_date` date NOT NULL,
   `ceremony_type` enum('civil','religious','both') NOT NULL DEFAULT 'both',
   `church_id` int(11) DEFAULT NULL,
-  `sector_id` int(11) NOT NULL,
-  `status` enum('pending','under_review','sector_approved','approved','rejected','completed') NOT NULL DEFAULT 'pending',
+  `sector_id` int(11) DEFAULT NULL,
+  `status` enum('pending','under_review','sector_approved','approved','rejected','completed','civil_completed') NOT NULL DEFAULT 'pending',
   `civil_status` enum('pending','approved','rejected') NOT NULL DEFAULT 'pending',
   `church_status` enum('pending','approved','rejected') NOT NULL DEFAULT 'pending',
   `civil_admin_id` int(11) DEFAULT NULL,
@@ -230,18 +235,65 @@ CREATE TABLE `marriage_applications` (
   `civil_reviewed_at` datetime DEFAULT NULL,
   `church_reviewed_at` datetime DEFAULT NULL,
   `created_at` datetime NOT NULL,
-  `updated_at` datetime NOT NULL
+  `updated_at` datetime NOT NULL,
+  `marriage_location` varchar(200) DEFAULT NULL,
+  `completion_comments` text DEFAULT NULL,
+  `completed_by` int(11) DEFAULT NULL,
+  `completed_at` datetime DEFAULT NULL,
+  `civil_marriage_date` date DEFAULT NULL,
+  `civil_marriage_location` varchar(200) DEFAULT NULL,
+  `civil_completion_comments` text DEFAULT NULL,
+  `civil_completed_by` int(11) DEFAULT NULL,
+  `civil_completed_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `marriage_applications`
 --
 
-INSERT INTO `marriage_applications` (`id`, `application_number`, `user_id`, `groom_first_name`, `groom_last_name`, `groom_date_of_birth`, `groom_id_number`, `groom_phone`, `groom_address`, `bride_first_name`, `bride_last_name`, `bride_date_of_birth`, `bride_id_number`, `bride_phone`, `bride_address`, `marriage_date`, `ceremony_type`, `church_id`, `sector_id`, `status`, `civil_status`, `church_status`, `civil_admin_id`, `church_leader_id`, `civil_comments`, `church_comments`, `documents`, `civil_reviewed_at`, `church_reviewed_at`, `created_at`, `updated_at`) VALUES
-(1, 'APP-1737624000000', 63, 'John', 'Doe', '1990-01-01', '1234567890123', '0781234567', NULL, 'Jane', 'Smith', '1992-05-15', '9876543210987', '0787654321', NULL, '2025-12-25', 'both', 1, 1, 'pending', 'pending', 'pending', NULL, NULL, NULL, NULL, NULL, NULL, NULL, '2025-10-24 08:04:29', '2025-10-24 08:04:29'),
-(2, 'APP-1737625000000', 63, 'Test', 'User', '1990-01-01', '1234567890123', '0781234567', NULL, 'Test', 'Bride', '1992-05-15', '9876543210987', '0787654321', NULL, '2025-12-25', 'both', 1, 1, 'approved', 'pending', 'pending', NULL, NULL, NULL, NULL, NULL, NULL, NULL, '2025-10-24 08:07:51', '2025-10-24 12:37:07'),
-(4, 'APP-1737625000001', 63, 'John', 'Doe', '1990-01-01', '1234567890123', '0781234567', NULL, 'Jane', 'Smith', '1992-05-15', '9876543210987', '0787654321', NULL, '2025-12-25', 'both', 1, 1, 'approved', 'pending', 'pending', NULL, NULL, NULL, NULL, NULL, NULL, NULL, '2025-10-24 08:55:32', '2025-10-24 10:02:49'),
-(5, 'APP-1761299151304', 65, 'dusabimana ', 'Hozana', '1905-10-24', '1234567812345678', '0781646346', '', 'Ange ', 'Kevine', '1901-10-24', '1234567812345678', '0764364735', '', '2025-11-23', 'both', 4, 1, 'approved', 'pending', 'pending', NULL, NULL, NULL, NULL, NULL, NULL, NULL, '2025-10-24 09:45:51', '2025-10-24 10:02:48');
+INSERT INTO `marriage_applications` (`id`, `application_number`, `user_id`, `groom_first_name`, `groom_last_name`, `groom_date_of_birth`, `groom_id_number`, `groom_phone`, `groom_address`, `bride_first_name`, `bride_last_name`, `bride_date_of_birth`, `bride_id_number`, `bride_phone`, `bride_address`, `marriage_date`, `ceremony_type`, `church_id`, `sector_id`, `status`, `civil_status`, `church_status`, `civil_admin_id`, `church_leader_id`, `civil_comments`, `church_comments`, `documents`, `civil_reviewed_at`, `church_reviewed_at`, `created_at`, `updated_at`, `marriage_location`, `completion_comments`, `completed_by`, `completed_at`, `civil_marriage_date`, `civil_marriage_location`, `civil_completion_comments`, `civil_completed_by`, `civil_completed_at`) VALUES
+(1, 'APP-1737624000000', 63, 'John', 'Doe', '1990-01-01', '1234567890123', '0781234567', NULL, 'Jane', 'Smith', '1992-05-15', '9876543210987', '0787654321', NULL, '2025-12-25', 'both', 1, 1, 'sector_approved', 'approved', 'pending', 7, 66, 'Approved by system for testing', NULL, NULL, '2025-10-26 10:49:04', '2025-10-25 20:37:37', '2025-10-24 08:04:29', '2025-10-26 10:49:04', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(2, 'APP-1737625000000', 63, 'Test', 'User', '1990-01-01', '1234567890123', '0781234567', NULL, 'Test', 'Bride', '1992-05-15', '9876543210987', '0787654321', NULL, '2025-12-25', 'both', 1, 1, 'sector_approved', 'approved', 'pending', 7, NULL, 'Approved by system for testing', NULL, NULL, '2025-10-26 10:49:04', NULL, '2025-10-24 08:07:51', '2025-10-26 10:49:04', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(4, 'APP-1737625000001', 63, 'John', 'Doe', '1990-01-01', '1234567890123', '0781234567', NULL, 'Jane', 'Smith', '1992-05-15', '9876543210987', '0787654321', NULL, '2025-12-25', 'both', 1, 1, 'civil_completed', 'approved', 'pending', 63, NULL, NULL, NULL, NULL, '2025-10-26 10:31:37', NULL, '2025-10-24 08:55:32', '2025-10-26 10:31:52', NULL, NULL, NULL, NULL, '2025-12-25', 'Methodiste', '', 63, '2025-10-26 10:31:52'),
+(5, 'APP-1761299151304', 65, 'dusabimana ', 'Hozana', '1905-10-24', '1234567812345678', '0781646346', '', 'Ange ', 'Kevine', '1901-10-24', '1234567812345678', '0764364735', '', '2025-11-23', 'both', 1, 1, 'completed', 'approved', 'approved', 63, 66, NULL, NULL, NULL, '2025-10-26 10:22:16', '2025-10-26 10:23:47', '2025-10-24 09:45:51', '2025-10-26 10:59:55', 'sector main hall', '', 66, '2025-10-26 10:59:55', '2025-12-20', 'Civil Registry Office, Kigali', 'Civil ceremony completed successfully', 66, '2025-10-26 10:26:39'),
+(6, 'APP-1761425092128', 70, 'Hozana', 'DUSABIMANA', '1949-10-25', '1234567812345678', '0791724884', '', 'DUSABIMANA', 'Hozana', '1949-10-25', '123456782345678', '0791724884', '', '2025-12-25', 'both', 1, 1, 'completed', 'approved', 'approved', 63, 66, NULL, NULL, NULL, '2025-10-26 10:12:47', '2025-10-26 10:16:17', '2025-10-25 20:44:52', '2025-10-26 10:59:11', 'sector camp', '', 66, '2025-10-26 10:59:11', NULL, NULL, NULL, NULL, NULL),
+(7, 'APP-1761593995655', 71, 'Igihozo', 'Cynthia', '1901-10-27', 'yurkxojhvuhdgxuige', '0785419324', '', 'Igihozo', 'Cynthia', '1905-10-27', '1200086585684', '0785419324', '', '2025-11-26', 'both', 1, 4, 'pending', 'pending', 'pending', NULL, NULL, NULL, NULL, NULL, NULL, NULL, '2025-10-27 19:39:55', '2025-10-27 19:39:55', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(8, 'APP-1761761406254', 71, 'hozana', 'hozana', '2003-10-24', '1200374776236875', '0785419324', '', 'hozana', 'hozana', '1917-10-24', '1191754768756786', '0785419324', '', '2025-11-28', 'religious', 1, NULL, 'completed', 'pending', 'approved', NULL, 6, NULL, NULL, '{\"uploadedFiles\":[{\"filename\":\"file-1761761280111-454677345.pdf\",\"originalName\":\"Registration Form.pdf\",\"size\":157360,\"type\":\"application/pdf\"}],\"uploadedAt\":\"2025-10-29T18:10:06.341Z\"}', NULL, '2025-10-29 18:56:42', '2025-10-29 18:10:06', '2025-10-29 18:56:56', 'musanze hall', '', 6, '2025-10-29 18:56:56', NULL, NULL, NULL, NULL, NULL),
+(10, 'APP-1763382941064', 74, 'Hozana', 'DUSABIMANA', '2007-11-07', '1200765236754722', '0791724884', '', 'Hozana', 'DUSABIMANA', '2007-11-06', '1200763234875684', '0791724884', '', '2025-12-17', 'religious', 1, NULL, 'completed', 'pending', 'approved', NULL, 66, NULL, NULL, '{\"uploadedFiles\":[{\"filename\":\"file-1763382938603-699365857.pdf\",\"originalName\":\"TEACHING TIMETABLE Y1SEM. I 2025-2026.pdf\",\"path\":\"uploads\\\\file-1763382938603-699365857.pdf\",\"size\":622647,\"category\":\"marriage_certificate\"}],\"uploadedAt\":\"2025-11-17T12:35:41.107Z\"}', NULL, '2025-11-17 12:45:03', '2025-11-17 12:35:41', '2025-11-17 12:45:10', 'main hall', 'ejwknf', 66, '2025-11-17 12:45:10', NULL, NULL, NULL, NULL, NULL);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `member_notifications`
+--
+
+CREATE TABLE `member_notifications` (
+  `id` int(11) NOT NULL,
+  `member_id` int(11) NOT NULL,
+  `title` varchar(200) NOT NULL,
+  `message` text NOT NULL,
+  `type` enum('info','success','warning','error') NOT NULL DEFAULT 'info',
+  `is_read` tinyint(1) DEFAULT 0,
+  `read_at` datetime DEFAULT NULL,
+  `related_entity_type` varchar(50) DEFAULT NULL,
+  `related_entity_id` int(11) DEFAULT NULL,
+  `action_url` varchar(500) DEFAULT NULL,
+  `data` text DEFAULT NULL,
+  `created_at` datetime DEFAULT current_timestamp(),
+  `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `member_notifications`
+--
+
+INSERT INTO `member_notifications` (`id`, `member_id`, `title`, `message`, `type`, `is_read`, `read_at`, `related_entity_type`, `related_entity_id`, `action_url`, `data`, `created_at`, `updated_at`) VALUES
+(8, 1, 'Service Request Approved', 'Your confirmation service request has been approved! Request #REQ-1761472021180-KGP34', 'success', 1, '2025-10-26 10:01:51', 'service_request', 6, NULL, '{\"requestId\":6,\"requestNumber\":\"REQ-1761472021180-KGP34\",\"serviceType\":\"confirmation\",\"status\":\"approved\",\"previousStatus\":\"pending\"}', '2025-10-26 09:57:57', '2025-10-26 10:01:51'),
+(9, 1, 'Service Request Approved', 'Your baptism service request has been approved!', 'success', 1, '2025-10-26 10:01:51', 'service_request', 1, NULL, '{\"requestId\":1,\"requestNumber\":\"REQ-1737624000000-ABC12\",\"serviceType\":\"baptism\",\"status\":\"approved\",\"previousStatus\":\"approved\"}', '2025-10-26 09:58:49', '2025-10-26 10:01:51'),
+(10, 1, 'Service Request Approved', 'Your confirmation service request has been approved!', 'success', 1, '2025-10-26 10:01:51', 'service_request', 6, NULL, '{\"requestId\":6,\"requestNumber\":\"REQ-1761472021180-KGP34\",\"serviceType\":\"confirmation\",\"status\":\"approved\",\"previousStatus\":\"approved\"}', '2025-10-26 10:01:39', '2025-10-26 10:01:51'),
+(11, 1, 'Service Request Approved', 'Your marriage service request has been approved!', 'success', 0, NULL, 'service_request', 5, NULL, '{\"requestId\":5,\"requestNumber\":\"REQ-1761468345772-2MV8H\",\"serviceType\":\"marriage\",\"status\":\"approved\",\"previousStatus\":\"approved\"}', '2025-10-26 10:02:01', '2025-10-26 10:02:01'),
+(12, 1, 'Service Request Submitted', 'Your baptism service request has been submitted successfully. Request #REQ-1761510191486-KZMOR', 'success', 0, NULL, 'service_request', 7, NULL, '{\"requestId\":7,\"requestNumber\":\"REQ-1761510191486-KZMOR\",\"serviceType\":\"baptism\",\"status\":\"pending\"}', '2025-10-26 20:23:13', '2025-10-26 20:23:13'),
+(13, 1, 'Service Request Approved', 'Your baptism service request has been approved!', 'success', 0, NULL, 'service_request', 7, NULL, '{\"requestId\":7,\"requestNumber\":\"REQ-1761510191486-KZMOR\",\"serviceType\":\"baptism\",\"status\":\"approved\",\"previousStatus\":\"approved\"}', '2025-10-26 20:23:52', '2025-10-26 20:23:52');
 
 -- --------------------------------------------------------
 
@@ -260,9 +312,33 @@ CREATE TABLE `notifications` (
   `related_entity_type` varchar(50) DEFAULT NULL,
   `related_entity_id` int(11) DEFAULT NULL,
   `action_url` varchar(500) DEFAULT NULL,
+  `data` text DEFAULT NULL,
   `created_at` datetime NOT NULL,
   `updated_at` datetime NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `notifications`
+--
+
+INSERT INTO `notifications` (`id`, `user_id`, `title`, `message`, `type`, `is_read`, `read_at`, `related_entity_type`, `related_entity_id`, `action_url`, `data`, `created_at`, `updated_at`) VALUES
+(2, 70, 'Marriage Application Submitted', 'Your marriage application has been submitted successfully. Application #APP-20250101-001', 'success', 1, '2025-10-26 10:12:34', 'marriage_application', 1, NULL, NULL, '2025-10-26 10:04:30', '2025-10-26 10:12:34'),
+(6, 70, 'Marriage Application Approved (Sector)', 'Your marriage application has been approved at the sector level. Application #APP-1761425092128', 'success', 0, NULL, 'marriage_application', 6, NULL, '{\"applicationId\":6,\"applicationNumber\":\"APP-1761425092128\",\"status\":\"sector_approved\",\"previousStatus\":\"pending\"}', '2025-10-26 10:12:49', '2025-10-26 10:12:49'),
+(7, 70, 'Marriage Completed', 'Congratulations! Your marriage has been completed. Application #APP-1761425092128', 'success', 0, NULL, 'marriage_application', 6, NULL, '{\"applicationId\":6,\"applicationNumber\":\"APP-1761425092128\",\"status\":\"completed\",\"previousStatus\":\"approved\",\"marriageDate\":\"2025-12-25\",\"marriageLocation\":\"St. Mary Catholic Church, Kigali\"}', '2025-10-26 10:16:50', '2025-10-26 10:16:50'),
+(8, 65, 'Marriage Application Approved (Sector)', 'Your marriage application has been approved at the sector level. Application #APP-1761299151304', 'success', 0, NULL, 'marriage_application', 5, NULL, '{\"applicationId\":5,\"applicationNumber\":\"APP-1761299151304\",\"status\":\"sector_approved\",\"previousStatus\":\"pending\"}', '2025-10-26 10:22:18', '2025-10-26 10:22:18'),
+(9, 65, 'Civil Marriage Completed', 'Your civil marriage has been completed. Application #APP-1761299151304', 'success', 0, NULL, 'marriage_application', 5, NULL, '{\"applicationId\":5,\"applicationNumber\":\"APP-1761299151304\",\"status\":\"civil_completed\",\"previousStatus\":\"civil_completed\",\"civilMarriageDate\":\"2025-12-20\",\"civilMarriageLocation\":\"Civil Registry Office, Kigali\"}', '2025-10-26 10:26:41', '2025-10-26 10:26:41'),
+(10, 63, 'Marriage Application Approved (Sector)', 'Your marriage application has been approved at the sector level. Application #APP-1737625000001', 'success', 0, NULL, 'marriage_application', 4, NULL, '{\"applicationId\":4,\"applicationNumber\":\"APP-1737625000001\",\"status\":\"sector_approved\",\"previousStatus\":\"pending\"}', '2025-10-26 10:31:39', '2025-10-26 10:31:39'),
+(11, 63, 'Civil Marriage Completed', 'Your civil marriage has been completed. Application #APP-1737625000001', 'success', 0, NULL, 'marriage_application', 4, NULL, '{\"applicationId\":4,\"applicationNumber\":\"APP-1737625000001\",\"status\":\"civil_completed\",\"previousStatus\":\"civil_completed\",\"civilMarriageDate\":\"2025-12-25\",\"civilMarriageLocation\":\"Methodiste\"}', '2025-10-26 10:31:54', '2025-10-26 10:31:54'),
+(12, 70, 'Marriage Completed', 'Congratulations! Your marriage has been completed. Application #APP-1761425092128', 'success', 0, NULL, 'marriage_application', 6, NULL, '{\"applicationId\":6,\"applicationNumber\":\"APP-1761425092128\",\"status\":\"completed\",\"previousStatus\":\"approved\",\"marriageDate\":\"2025-12-25\",\"marriageLocation\":\"sector camp\"}', '2025-10-26 10:59:13', '2025-10-26 10:59:13'),
+(13, 65, 'Marriage Completed', 'Congratulations! Your marriage has been completed. Application #APP-1761299151304', 'success', 0, NULL, 'marriage_application', 5, NULL, '{\"applicationId\":5,\"applicationNumber\":\"APP-1761299151304\",\"status\":\"completed\",\"previousStatus\":\"approved\",\"marriageDate\":\"2025-11-23\",\"marriageLocation\":\"sector main hall\"}', '2025-10-26 10:59:57', '2025-10-26 10:59:57'),
+(14, 71, 'Marriage Application Submitted', 'Your marriage application has been submitted successfully. Application #APP-1761593995655', 'success', 0, NULL, 'marriage_application', 7, NULL, '{\"applicationId\":7,\"applicationNumber\":\"APP-1761593995655\",\"status\":\"pending\"}', '2025-10-27 19:39:57', '2025-10-27 19:39:57'),
+(15, 71, 'Marriage Application Submitted', 'Your marriage application has been submitted successfully. Application #APP-1761761406254', 'success', 0, NULL, 'marriage_application', 8, NULL, '{\"applicationId\":8,\"applicationNumber\":\"APP-1761761406254\",\"status\":\"pending\"}', '2025-10-29 18:10:08', '2025-10-29 18:10:08'),
+(16, 71, 'Religious Marriage Application Approved', 'Congratulations! Your religious marriage application has been approved by the church. Application #APP-1761761406254', 'success', 0, NULL, 'marriage_application', 8, NULL, '{\"applicationId\":8,\"applicationNumber\":\"APP-1761761406254\",\"status\":\"approved\",\"previousStatus\":\"pending\"}', '2025-10-29 18:56:44', '2025-10-29 18:56:44'),
+(17, 71, 'Marriage Completed', 'Congratulations! Your marriage has been completed. Application #APP-1761761406254', 'success', 0, NULL, 'marriage_application', 8, NULL, '{\"applicationId\":8,\"applicationNumber\":\"APP-1761761406254\",\"status\":\"completed\",\"previousStatus\":\"approved\",\"marriageDate\":\"2025-11-28\",\"marriageLocation\":\"musanze hall\"}', '2025-10-29 18:56:58', '2025-10-29 18:56:58'),
+(18, 73, 'Marriage Application Submitted', 'Your marriage application has been submitted successfully. Application #APP-1762979818842', 'success', 0, NULL, 'marriage_application', 9, NULL, '{\"applicationId\":9,\"applicationNumber\":\"APP-1762979818842\",\"status\":\"pending\"}', '2025-11-12 20:37:05', '2025-11-12 20:37:05'),
+(19, 74, 'Marriage Application Submitted', 'Your marriage application has been submitted successfully. Application #APP-1763382941064', 'success', 0, NULL, 'marriage_application', 10, NULL, '{\"applicationId\":10,\"applicationNumber\":\"APP-1763382941064\",\"status\":\"pending\"}', '2025-11-17 12:35:41', '2025-11-17 12:35:41'),
+(20, 74, 'Religious Marriage Application Approved', 'Congratulations! Your religious marriage application has been approved by the church. Application #APP-1763382941064', 'success', 0, NULL, 'marriage_application', 10, NULL, '{\"applicationId\":10,\"applicationNumber\":\"APP-1763382941064\",\"status\":\"approved\",\"previousStatus\":\"pending\"}', '2025-11-17 12:45:04', '2025-11-17 12:45:04'),
+(21, 74, 'Marriage Completed', 'Congratulations! Your marriage has been completed. Application #APP-1763382941064', 'success', 0, NULL, 'marriage_application', 10, NULL, '{\"applicationId\":10,\"applicationNumber\":\"APP-1763382941064\",\"status\":\"completed\",\"previousStatus\":\"approved\",\"marriageDate\":\"2025-12-17\",\"marriageLocation\":\"main hall\"}', '2025-11-17 12:45:11', '2025-11-17 12:45:11');
 
 -- --------------------------------------------------------
 
@@ -319,7 +395,59 @@ CREATE TABLE `service_comments` (
 --
 
 INSERT INTO `service_comments` (`id`, `service_id`, `member_id`, `comment`, `comment_type`, `is_anonymous`, `is_read`, `created_at`, `updated_at`) VALUES
-(1, 15, 1, 'WE will be there', 'general', 1, 0, '2025-10-24 14:37:14', '2025-10-24 14:37:14');
+(1, 15, 1, 'WE will be there', 'general', 1, 0, '2025-10-24 14:37:14', '2025-10-24 14:37:14'),
+(2, 15, 1, 'The groom have other baby', 'general', 0, 0, '2025-10-25 20:40:18', '2025-10-25 20:40:18');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `service_requests`
+--
+
+CREATE TABLE `service_requests` (
+  `id` int(11) NOT NULL,
+  `request_number` varchar(50) NOT NULL,
+  `member_id` int(11) NOT NULL,
+  `service_type` enum('baptism','marriage','funeral','communion','confirmation','dedication','other') NOT NULL,
+  `title` varchar(200) NOT NULL,
+  `description` text DEFAULT NULL,
+  `requested_date` date DEFAULT NULL,
+  `preferred_time` time DEFAULT NULL,
+  `location` varchar(200) DEFAULT NULL,
+  `status` enum('pending','under_review','approved','scheduled','completed','rejected','cancelled') NOT NULL DEFAULT 'pending',
+  `priority` enum('low','medium','high','urgent') NOT NULL DEFAULT 'medium',
+  `special_requirements` text DEFAULT NULL,
+  `contact_phone` varchar(20) DEFAULT NULL,
+  `contact_email` varchar(100) DEFAULT NULL,
+  `estimated_attendees` int(11) DEFAULT NULL,
+  `related_service_id` int(11) DEFAULT NULL,
+  `assigned_to_id` int(11) DEFAULT NULL,
+  `reviewed_by` int(11) DEFAULT NULL,
+  `reviewed_at` datetime DEFAULT NULL,
+  `review_comments` text DEFAULT NULL,
+  `rejection_reason` text DEFAULT NULL,
+  `scheduled_date` datetime DEFAULT NULL,
+  `scheduled_time` time DEFAULT NULL,
+  `scheduled_location` varchar(200) DEFAULT NULL,
+  `is_urgent` tinyint(1) DEFAULT 0,
+  `is_public` tinyint(1) DEFAULT 1,
+  `notes` text DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `service_requests`
+--
+
+INSERT INTO `service_requests` (`id`, `request_number`, `member_id`, `service_type`, `title`, `description`, `requested_date`, `preferred_time`, `location`, `status`, `priority`, `special_requirements`, `contact_phone`, `contact_email`, `estimated_attendees`, `related_service_id`, `assigned_to_id`, `reviewed_by`, `reviewed_at`, `review_comments`, `rejection_reason`, `scheduled_date`, `scheduled_time`, `scheduled_location`, `is_urgent`, `is_public`, `notes`, `created_at`, `updated_at`) VALUES
+(1, 'REQ-1737624000000-ABC12', 1, 'baptism', 'Baptism Service Request', 'I would like to request a baptism service for my child who is turning 3 years old.', '2025-12-15', '10:00:00', 'Main Church Hall', 'pending', 'medium', 'Need wheelchair accessibility', '0781234567', NULL, 25, NULL, NULL, 66, '2025-10-26 09:53:30', '', '', NULL, NULL, NULL, 0, 1, NULL, '2025-10-26 07:18:24', '2025-10-26 11:59:22'),
+(2, 'REQ-1737624000001-DEF34', 2, 'marriage', 'Wedding Ceremony Request', 'We would like to have our wedding ceremony at the church. Both of us are active members.', '2025-12-20', '14:00:00', 'Main Church Hall', 'pending', 'high', 'Need special music arrangements', '0787654321', NULL, 150, NULL, NULL, 66, '2025-10-26 08:40:56', '', '', NULL, NULL, NULL, 0, 1, NULL, '2025-10-26 07:18:24', '2025-10-26 11:50:54'),
+(3, 'REQ-1737624000002-GHI56', 3, 'funeral', 'Funeral Service Request', 'Requesting funeral service for my late father who was a long-time member.', '2025-12-10', '09:00:00', 'Main Church Hall', 'pending', 'urgent', 'Family from out of town will attend', '0789998888', NULL, 80, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1, 1, NULL, '2025-10-26 07:18:24', '2025-10-26 11:54:31'),
+(4, 'REQ-1761465298890-8P03O', 4, 'baptism', 'Baptism ', 'I want to be baptised', '2025-10-28', '11:56:00', 'Main church hall', 'pending', 'medium', '', '0785419324', 'dhozana559@gmail.com', 200, NULL, NULL, 66, '2025-10-26 09:52:40', '', '', NULL, NULL, NULL, 0, 1, NULL, '2025-10-26 07:54:58', '2025-10-26 11:59:26'),
+(5, 'REQ-1761468345772-2MV8H', 1, 'marriage', 'Baptism ', 'I want to be baptised', '2025-10-27', '10:45:00', 'Main church hall', 'approved', 'medium', '', '0785419324', 'dhozana559@gmail.com', 200, NULL, NULL, 66, '2025-10-26 10:01:59', '', '', NULL, NULL, NULL, 1, 1, NULL, '2025-10-26 08:45:45', '2025-10-26 10:01:59'),
+(6, 'REQ-1761472021180-KGP34', 1, 'confirmation', 'membership confirmation', 'I want to be the member of the church', '2025-10-27', '11:46:00', 'In church', 'approved', 'high', '', '0785419324', 'dhozana559@gmail.com', 13, NULL, NULL, 66, '2025-10-26 10:01:37', '', '', NULL, NULL, NULL, 0, 1, NULL, '2025-10-26 09:47:01', '2025-10-26 10:01:37'),
+(7, 'REQ-1761510191486-KZMOR', 1, 'baptism', 'Baptism ', 'Be baptised', '2025-10-27', '22:22:00', 'Main Hall', 'approved', 'medium', '', '0785419324', 'dhozana559@gmail.com', 120, NULL, NULL, 66, '2025-10-26 20:23:50', '', '', NULL, NULL, NULL, 0, 1, NULL, '2025-10-26 20:23:11', '2025-10-26 20:23:50');
 
 -- --------------------------------------------------------
 
@@ -341,53 +469,62 @@ CREATE TABLE `users` (
   `is_active` tinyint(1) DEFAULT 1,
   `last_login` datetime DEFAULT NULL,
   `created_at` datetime NOT NULL,
-  `updated_at` datetime NOT NULL
+  `updated_at` datetime NOT NULL,
+  `reset_password_token` varchar(255) DEFAULT NULL,
+  `reset_password_expires` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `users`
 --
 
-INSERT INTO `users` (`id`, `username`, `email`, `password`, `first_name`, `last_name`, `user_type`, `phone`, `church_id`, `sector_id`, `is_active`, `last_login`, `created_at`, `updated_at`) VALUES
-(2, 'testuser', 'test@example.com', '$2a$10$rDo8D2HqyyEfHG4AE3ojC.np9Kz/D/Zo766fqZJGqVJfiZnbE67ru', 'Test', 'User', 'couple', '+250788123456', NULL, 1, 1, '2025-10-24 06:54:46', '2025-10-24 06:05:20', '2025-10-24 06:54:46'),
-(3, 'testcouple', 'couple@test.com', '$2a$10$v7O23Fy0KBrhqhsfjRX8F.CGBn6GcN7UgbqROS33O5HcRCzRK4cJ6', 'John', 'Doe', 'couple', '+250788111111', NULL, 1, 1, '2025-10-24 06:07:27', '2025-10-24 06:06:55', '2025-10-24 06:07:27'),
-(6, 'churchleader', 'leader@church.com', '$2a$10$e1Di8GO1dGezo/.Tk0tUHuYjdj2rlayTm7Rk0jdEa5WHcPNer6Tuq', 'Pastor', 'Smith', 'church_leader', '+250788222222', 1, 1, 1, NULL, '2025-10-24 06:07:06', '2025-10-24 06:07:06'),
-(7, 'civiladmin', 'admin@civil.gov.rw', '$2a$10$YO/pVkGp8wnr/6GaCOvhku8iXNDwFy5lie72rX.IJ01abxexFFtra', 'Civil', 'Admin', 'civil_admin', '+250788333333', NULL, 1, 1, NULL, '2025-10-24 06:07:18', '2025-10-24 06:07:18'),
-(11, 'testuser123', 'testuser123@example.com', '$2a$10$cc8vHLYJQ7.027DUNUnH/eY6Q7m3.2Mu0ni2htbyjv.f.O2OR49AO', 'Test', 'User', 'couple', '+250788111111', NULL, 1, 1, NULL, '2025-10-24 06:13:14', '2025-10-24 06:13:14'),
-(12, 'frontendtest2', 'frontendtest2@example.com', '$2a$10$..3zmfQRIOOCIYA35DIgROWG3hVBmPBbzVHequ2vvWCgjGw/Latti', 'Frontend', 'Test', 'couple', '+250788999999', NULL, 1, 1, NULL, '2025-10-24 06:17:22', '2025-10-24 06:17:22'),
-(14, 'newuser123', 'newuser@example.com', '$2a$10$CjhnUnZPMX5ffQTEkVKPs.L5my5.9tyJL7vM2HVvQfJV4qvp/2ova', 'New', 'User', 'couple', NULL, NULL, 1, 1, '2025-10-24 06:19:49', '2025-10-24 06:19:42', '2025-10-24 06:19:49'),
-(16, 'testuser2', 'test2@example.com', '$2a$10$oYwGbI3Xn301PzS713ZEpuoyNd.dDyuQ1e.IS68i78qqSMWwfMaQ2', 'Test', 'User', 'couple', NULL, NULL, 1, 1, NULL, '2025-10-24 06:23:08', '2025-10-24 06:23:08'),
-(17, 'testuser3', 'test3@example.com', '$2a$10$pkIXAR/XfqIcGcAHA.DUBuWf5l0fi2cUWNRviIktEvfA/wzDILfFm', 'Test', 'User', 'couple', NULL, NULL, 1, 1, NULL, '2025-10-24 06:23:39', '2025-10-24 06:23:39'),
-(19, 'testuser4', 'test4@example.com', '$2a$10$vuHIR2AMdXEDqe/Bvgcx/.qgy1FSNlSWeXbk6AqO/V6pydt0Lljcy', 'Test', 'User', 'couple', NULL, NULL, 1, 1, NULL, '2025-10-24 06:26:43', '2025-10-24 06:26:43'),
-(21, 'newcouple123', 'newcouple@example.com', '$2a$10$vzsg/tBB.YS5edCqIjxeN.96uP/v56bA2CiGbwiuufZHLWDf7rCGy', 'Jane', 'Smith', 'couple', '+250788999888', NULL, 1, 1, '2025-10-24 06:28:12', '2025-10-24 06:28:06', '2025-10-24 06:28:12'),
-(23, 'testcouple456', 'couple456@test.com', '$2a$10$BEutVmm7uLf/Jx6Y/xOTeujEku6c3eLUTpwZtydKV1GHxXpPialR.', 'John', 'Doe', 'couple', '+250788123456', NULL, 1, 1, '2025-10-24 06:31:56', '2025-10-24 06:31:42', '2025-10-24 06:31:56'),
-(24, 'churchleader456', 'leader456@church.com', '$2a$10$.mDFOoSRZy14sC9DZkfnl.NsaWDq64dCZNK4w5jygQ5MqzSfYlJqS', 'Pastor', 'Maria', 'church_leader', '+250788654321', 1, 1, 1, '2025-10-24 06:32:03', '2025-10-24 06:31:48', '2025-10-24 06:32:03'),
-(27, 'testuser789', 'test789@example.com', '$2a$10$R/ZR/rIXq4/4O6Km3Ebp1ek28k2wIatQAuw/gXIxoEa/sx3TvtKBa', 'Test', 'User', 'couple', '+250788123456', NULL, 1, 1, NULL, '2025-10-24 06:37:06', '2025-10-24 06:37:06'),
-(28, 'finaltest123', 'finaltest@example.com', '$2a$10$o2kglJIMlWCzuFR/8uLCOO1LrcOLM6DWrk3xvIzCXH/nNoPzTbfry', 'Final', 'Test', 'couple', '+250788999888', NULL, 1, 1, NULL, '2025-10-24 06:37:20', '2025-10-24 06:37:20'),
-(30, 'browsertest123', 'browsertest@example.com', '$2a$10$TpbCETAZCJRyT2493oFahe/0bkfJ67GUTONw4DjmX073T8hDERPlu', 'Browser', 'Test', 'couple', '+250788111222', NULL, 1, 1, NULL, '2025-10-24 06:40:18', '2025-10-24 06:40:18'),
-(31, 'browsertest456', 'browsertest456@example.com', '$2a$10$i2XZpxq2G3705xMRupWZHuMHM2iwVSlfycPXDwAvEeDI2n0rciuQa', 'Browser', 'Test', 'couple', '+250788333444', NULL, 1, 1, NULL, '2025-10-24 06:40:35', '2025-10-24 06:40:35'),
-(38, 'hozanas', 'dhozana559@gmail.com', '$2a$10$PhRpqVgx6i3gaf9wGeuaAutoOGVw3ch0F3PiW26ZommUfYfRPhroa', 'Hozana', 'DUSABIMANA', 'civil_admin', '0791724880', NULL, 1, 1, '2025-10-24 06:53:24', '2025-10-24 06:44:12', '2025-10-24 06:53:24'),
-(43, 'autotest123', 'autotest@example.com', '$2a$10$bi.p9RDvw5VdMt4yJSWtfOPIP7mG.gpFq2ZY5dSgfqvZmjNXuOOh6', 'Auto', 'Test', 'couple', '+250788999888', NULL, 1, 1, '2025-10-24 06:52:44', '2025-10-24 06:52:37', '2025-10-24 06:52:44'),
-(44, 'churchleader123', 'churchleader@example.com', '$2a$10$NTM4.EhpRbCIqBqIeV9GRO37murNGQ8N4vID7eyx9rBPr0a28MKAO', 'Pastor', 'John', 'church_leader', '+250788111222', NULL, 1, 1, NULL, '2025-10-24 06:53:15', '2025-10-24 06:53:15'),
-(45, 'testuser20251024085508', 'test20251024085508@example.com', '$2a$10$67j.PVjqCV9cyy1aHxJucuFfW..M3TgwcWg/uZKkdLFzBvGT1mPwW', 'Test', 'User', 'couple', NULL, NULL, 1, 1, NULL, '2025-10-24 06:55:09', '2025-10-24 06:55:09'),
-(46, 'testuser20251024085718', 'test20251024085718@example.com', '$2a$10$AuIxGfXXK/UH344F4Ndsve/7gtQeWPX8vvFc.FbPTg221YQ5N48SO', 'Test', 'User', 'couple', '+250 788 123 456', NULL, 1, 1, NULL, '2025-10-24 06:57:18', '2025-10-24 06:57:18'),
-(47, 'demo20251024085743', 'demo20251024085743@test.com', '$2a$10$UKw9D9EsdpDzpr/QcGsCDu3UYg3bRb5l2Ty52K/rrBWUC59UkXZUS', 'Demo', 'User', 'couple', NULL, NULL, 1, 1, '2025-10-24 07:17:28', '2025-10-24 06:57:43', '2025-10-24 07:17:28'),
-(52, 'testuser20251024090352', 'test20251024090352@example.com', '$2a$10$v8kWBKflmDJrq/Sb92rPr.W/.Z/Lal349GneZuVWGoEUOUWoir2iW', 'Test', 'User', 'couple', NULL, NULL, 1, 1, NULL, '2025-10-24 07:03:52', '2025-10-24 07:03:52'),
-(53, 'testuser20251024090413', 'test20251024090413@example.com', '$2a$10$pJ.J3/NbVKKFu9HQNYK6puDIgJaLO6HKanyLMe2Tx5wPuONVZUZaW', 'Test', 'User', 'couple', NULL, NULL, 1, 1, NULL, '2025-10-24 07:04:13', '2025-10-24 07:04:13'),
-(54, 'testuser20251024090502', 'test20251024090502@example.com', '$2a$10$5SRBdwti1E67sST2Vc1f1eo2pM9rJZIRAIam8P8l720yBjpIiIXoO', 'Test', 'User', 'couple', NULL, NULL, 1, 1, NULL, '2025-10-24 07:05:02', '2025-10-24 07:05:02'),
-(56, 'johndoe20251024090657', 'john.doe20251024090657@example.com', '$2a$10$R3R5tvx9QRavRb9b95RJjuC5ljEqgy9SKjtD.c7b6gBOllWqEjoxS', 'John', 'Doe', 'couple', '+250 788 123 456', NULL, 1, 1, NULL, '2025-10-24 07:06:57', '2025-10-24 07:06:57'),
-(57, 'johndoe20251024090727', 'john.doe20251024090727@example.com', '$2a$10$qrvdEE18zCB6DS5MlkO3H.4ZXzJmLzPyJdEAD0CoDHZHK8aifArC6', 'John', 'Doe', 'couple', NULL, NULL, 1, 1, NULL, '2025-10-24 07:07:27', '2025-10-24 07:07:27'),
-(58, 'frontend20251024090811', 'frontend20251024090811@test.com', '$2a$10$OeJ9TDOnMutvKEyyRLFd9.KTxCN9h4VQ5QYnNFZpFt4ZODLWImt2u', 'Frontend', 'Test', 'couple', '+250 788 999 888', NULL, 1, 1, '2025-10-24 07:08:36', '2025-10-24 07:08:12', '2025-10-24 07:08:36'),
-(59, 'dhozana529@gmail.com', 'churchleader2@gmail.com', '$2a$10$YO9r0yvTWwsJ1Oey/F/MIu8ZpAJREGCHhNo0beQtKUKrFQscTVsD6', 'hozana', 'DUSABIMANA Hozana', 'couple', '0785419324', NULL, 1, 1, NULL, '2025-10-24 07:09:22', '2025-10-24 07:09:22'),
-(60, 'dhozana4', 'churchleaders4@gmail.com', '$2a$10$XNRg1h.Z03hbF7sxfBjsAug4Jqw6IG89ls8/IBmfi.K2QaJujGkqe', 'hozana', 'DUSABIMANA Hozana', 'church_leader', '0785419324', 7, 1, 1, NULL, '2025-10-24 07:09:43', '2025-10-24 07:09:43'),
-(61, 'civiladmin3', 'civiladmin3@gmail.com', '$2a$10$AHLm10b5HY59keI//4Mu..sjxbefa4oLTiV1bbUMPN6mif157TlFy', 'hozana', 'DUSABIMANA Hozana', 'civil_admin', '0785419324', NULL, 1, 1, NULL, '2025-10-24 07:10:29', '2025-10-24 07:10:29'),
-(62, 'admin20251024091739', 'admin20251024091739@test.com', '$2a$10$fTUXlcvZ27740Ub1mTl9k.eAK6K45p86XRxiJybBN/1dOolZHf3oe', 'Admin', 'User', 'civil_admin', NULL, NULL, 1, 1, '2025-10-24 07:24:03', '2025-10-24 07:17:40', '2025-10-24 07:24:03'),
-(63, 'civiladmin7', 'civiladmin7@gmail.com', '$2a$10$jSQtQ8lqrVhInUcY8InvA.A0KJwMACFczp135FAYPm4A4tBwGE65y', 'hozana', 'DUSABIMANA Hozana', 'civil_admin', '0785419324', NULL, 1, 1, '2025-10-24 15:21:09', '2025-10-24 07:27:27', '2025-10-24 15:21:09'),
-(64, 'civiladmin34', 'dhozana5534@gmail.com', '$2a$10$mG2ohcXRadVniVLS93261OhRvU2s97A2k2a/fKExqheUhDdJaaFUe', 'hozana', 'hozana', 'couple', '0785419324', NULL, 1, 1, NULL, '2025-10-24 07:34:30', '2025-10-24 07:34:30'),
-(65, 'danny1', 'couple1@gmail.com', '$2a$10$8SuRN7Q27JbouPkg1u4D6OnkUv.59uhPkegL/su2bXhqWLGVC.d7e', 'Danny', 'Vumbi', 'couple', '0789735484', 1, 1, 1, '2025-10-24 14:28:58', '2025-10-24 07:51:14', '2025-10-24 14:28:58'),
-(66, 'Cynthia@123', 'igihozo@gmail.com', '$2a$10$8SuRN7Q27JbouPkg1u4D6OnkUv.59uhPkegL/su2bXhqWLGVC.d7e', 'Igihozo', 'Cynthia', 'church_leader', '0785419324', 1, NULL, 1, '2025-10-24 14:42:15', '2025-10-24 12:32:25', '2025-10-24 14:42:15'),
-(67, 'coupletest', 'coupletest@example.com', '$2a$10$3pFRNzanpFKbY/in3.INleJbJspYA/CEhOVYuRIsa6QrzvPYYufKW', 'John', 'Doe', 'couple', '+250788111111', 1, 1, 1, NULL, '2025-10-24 15:17:46', '2025-10-24 15:17:46'),
-(68, 'danny12', 'mahorodocile2@gmail.com', '$2a$10$h2xzMAEgBVVLQtp.10Z2D.4snjmaySCLcyNIWCax7jQvofEzM0o1K', 'Danny', 'Vumbi', 'couple', '0789735482', 7, 1, 1, NULL, '2025-10-24 15:22:24', '2025-10-24 15:22:24');
+INSERT INTO `users` (`id`, `username`, `email`, `password`, `first_name`, `last_name`, `user_type`, `phone`, `church_id`, `sector_id`, `is_active`, `last_login`, `created_at`, `updated_at`, `reset_password_token`, `reset_password_expires`) VALUES
+(2, 'testuser', 'test@example.com', '$2a$10$rDo8D2HqyyEfHG4AE3ojC.np9Kz/D/Zo766fqZJGqVJfiZnbE67ru', 'Test', 'User', 'couple', '+250788123456', 1, 1, 1, '2025-10-24 06:54:46', '2025-10-24 06:05:20', '2025-10-26 12:00:30', '6d7f56f7bb38c7774fc99d45f09b25af9d2ee69ac518dd08ecaaf32a6ef5f8ba', '2025-10-26 13:00:30'),
+(3, 'testcouple', 'couple@test.com', '$2a$10$v7O23Fy0KBrhqhsfjRX8F.CGBn6GcN7UgbqROS33O5HcRCzRK4cJ6', 'John', 'Doe', 'couple', '+250788111111', 1, 1, 1, '2025-10-24 06:07:27', '2025-10-24 06:06:55', '2025-10-24 06:07:27', NULL, NULL),
+(6, 'churchleader', 'leader@church.com', '$2a$10$e1Di8GO1dGezo/.Tk0tUHuYjdj2rlayTm7Rk0jdEa5WHcPNer6Tuq', 'Pastor', 'Smith', 'church_leader', '+250788222222', 1, 1, 1, '2025-10-29 18:55:10', '2025-10-24 06:07:06', '2025-10-29 18:55:10', NULL, NULL),
+(7, 'civiladmin', 'admin@civil.gov.rw', '$2a$10$YO/pVkGp8wnr/6GaCOvhku8iXNDwFy5lie72rX.IJ01abxexFFtra', 'Civil', 'Admin', 'civil_admin', '+250788333333', 1, 1, 0, NULL, '2025-10-24 06:07:18', '2025-10-24 06:07:18', NULL, NULL),
+(11, 'testuser123', 'testuser123@example.com', '$2a$10$cc8vHLYJQ7.027DUNUnH/eY6Q7m3.2Mu0ni2htbyjv.f.O2OR49AO', 'Test', 'User', 'couple', '+250788111111', 1, 1, 1, NULL, '2025-10-24 06:13:14', '2025-10-24 06:13:14', NULL, NULL),
+(12, 'frontendtest2', 'frontendtest2@example.com', '$2a$10$..3zmfQRIOOCIYA35DIgROWG3hVBmPBbzVHequ2vvWCgjGw/Latti', 'Frontend', 'Test', 'couple', '+250788999999', 1, 1, 1, NULL, '2025-10-24 06:17:22', '2025-10-24 06:17:22', NULL, NULL),
+(14, 'newuser123', 'newuser@example.com', '$2a$10$CjhnUnZPMX5ffQTEkVKPs.L5my5.9tyJL7vM2HVvQfJV4qvp/2ova', 'New', 'User', 'couple', NULL, 1, 1, 1, '2025-10-24 06:19:49', '2025-10-24 06:19:42', '2025-10-24 06:19:49', NULL, NULL),
+(16, 'testuser2', 'test2@example.com', '$2a$10$oYwGbI3Xn301PzS713ZEpuoyNd.dDyuQ1e.IS68i78qqSMWwfMaQ2', 'Test', 'User', 'couple', NULL, 1, 1, 1, NULL, '2025-10-24 06:23:08', '2025-10-24 06:23:08', NULL, NULL),
+(17, 'testuser3', 'test3@example.com', '$2a$10$pkIXAR/XfqIcGcAHA.DUBuWf5l0fi2cUWNRviIktEvfA/wzDILfFm', 'Test', 'User', 'couple', NULL, 1, 1, 1, NULL, '2025-10-24 06:23:39', '2025-10-24 06:23:39', NULL, NULL),
+(19, 'testuser4', 'test4@example.com', '$2a$10$vuHIR2AMdXEDqe/Bvgcx/.qgy1FSNlSWeXbk6AqO/V6pydt0Lljcy', 'Test', 'User', 'couple', NULL, 1, 1, 1, NULL, '2025-10-24 06:26:43', '2025-10-24 06:26:43', NULL, NULL),
+(21, 'newcouple123', 'newcouple@example.com', '$2a$10$vzsg/tBB.YS5edCqIjxeN.96uP/v56bA2CiGbwiuufZHLWDf7rCGy', 'Jane', 'Smith', 'couple', '+250788999888', 1, 1, 1, '2025-10-24 06:28:12', '2025-10-24 06:28:06', '2025-10-24 06:28:12', NULL, NULL),
+(23, 'testcouple456', 'couple456@test.com', '$2a$10$BEutVmm7uLf/Jx6Y/xOTeujEku6c3eLUTpwZtydKV1GHxXpPialR.', 'John', 'Doe', 'couple', '+250788123456', 1, 1, 1, '2025-10-24 06:31:56', '2025-10-24 06:31:42', '2025-10-24 06:31:56', NULL, NULL),
+(24, 'churchleader456', 'leader456@church.com', '$2a$10$.mDFOoSRZy14sC9DZkfnl.NsaWDq64dCZNK4w5jygQ5MqzSfYlJqS', 'Pastor', 'Maria', 'church_leader', '+250788654321', 1, 1, 1, '2025-10-24 06:32:03', '2025-10-24 06:31:48', '2025-10-24 06:32:03', NULL, NULL),
+(27, 'testuser789', 'test789@example.com', '$2a$10$R/ZR/rIXq4/4O6Km3Ebp1ek28k2wIatQAuw/gXIxoEa/sx3TvtKBa', 'Test', 'User', 'couple', '+250788123456', 1, 1, 1, NULL, '2025-10-24 06:37:06', '2025-10-24 06:37:06', NULL, NULL),
+(28, 'finaltest123', 'finaltest@example.com', '$2a$10$o2kglJIMlWCzuFR/8uLCOO1LrcOLM6DWrk3xvIzCXH/nNoPzTbfry', 'Final', 'Test', 'couple', '+250788999888', 1, 1, 1, NULL, '2025-10-24 06:37:20', '2025-10-24 06:37:20', NULL, NULL),
+(30, 'browsertest123', 'browsertest@example.com', '$2a$10$TpbCETAZCJRyT2493oFahe/0bkfJ67GUTONw4DjmX073T8hDERPlu', 'Browser', 'Test', 'couple', '+250788111222', 1, 1, 1, NULL, '2025-10-24 06:40:18', '2025-10-24 06:40:18', NULL, NULL),
+(31, 'browsertest456', 'browsertest456@example.com', '$2a$10$i2XZpxq2G3705xMRupWZHuMHM2iwVSlfycPXDwAvEeDI2n0rciuQa', 'Browser', 'Test', 'couple', '+250788333444', 1, 1, 1, NULL, '2025-10-24 06:40:35', '2025-10-24 06:40:35', NULL, NULL),
+(38, 'hozanas', 'dhozana559@gmail.com', '$2a$10$VE0dcPQ4oR3CIfeL7./xGuuAjH8Px/4lHao.AJ.z29WLM0T6tnpJ.', 'Hozana', 'DUSABIMANA', 'civil_admin', '0791724880', 1, 1, 0, '2025-10-29 18:19:58', '2025-10-24 06:44:12', '2025-10-29 18:19:58', '3993f40c4641d1b147e518c21c3dca927c9aacb59f5b3322031a0953a551fa03', '2025-10-29 19:14:06'),
+(43, 'autotest123', 'autotest@example.com', '$2a$10$bi.p9RDvw5VdMt4yJSWtfOPIP7mG.gpFq2ZY5dSgfqvZmjNXuOOh6', 'Auto', 'Test', 'couple', '+250788999888', 1, 1, 1, '2025-10-24 06:52:44', '2025-10-24 06:52:37', '2025-10-24 06:52:44', NULL, NULL),
+(44, 'churchleader123', 'churchleader@example.com', '$2a$10$NTM4.EhpRbCIqBqIeV9GRO37murNGQ8N4vID7eyx9rBPr0a28MKAO', 'Pastor', 'John', 'church_leader', '+250788111222', 1, 1, 1, NULL, '2025-10-24 06:53:15', '2025-10-24 06:53:15', NULL, NULL),
+(45, 'testuser20251024085508', 'test20251024085508@example.com', '$2a$10$67j.PVjqCV9cyy1aHxJucuFfW..M3TgwcWg/uZKkdLFzBvGT1mPwW', 'Test', 'User', 'couple', NULL, 1, 1, 1, NULL, '2025-10-24 06:55:09', '2025-10-24 06:55:09', NULL, NULL),
+(46, 'testuser20251024085718', 'test20251024085718@example.com', '$2a$10$AuIxGfXXK/UH344F4Ndsve/7gtQeWPX8vvFc.FbPTg221YQ5N48SO', 'Test', 'User', 'couple', '+250 788 123 456', 1, 1, 1, NULL, '2025-10-24 06:57:18', '2025-10-24 06:57:18', NULL, NULL),
+(47, 'demo20251024085743', 'demo20251024085743@test.com', '$2a$10$UKw9D9EsdpDzpr/QcGsCDu3UYg3bRb5l2Ty52K/rrBWUC59UkXZUS', 'Demo', 'User', 'couple', NULL, 1, 1, 1, '2025-10-24 07:17:28', '2025-10-24 06:57:43', '2025-10-24 07:17:28', NULL, NULL),
+(52, 'testuser20251024090352', 'test20251024090352@example.com', '$2a$10$v8kWBKflmDJrq/Sb92rPr.W/.Z/Lal349GneZuVWGoEUOUWoir2iW', 'Test', 'User', 'couple', NULL, 1, 1, 1, NULL, '2025-10-24 07:03:52', '2025-10-24 07:03:52', NULL, NULL),
+(53, 'testuser20251024090413', 'test20251024090413@example.com', '$2a$10$pJ.J3/NbVKKFu9HQNYK6puDIgJaLO6HKanyLMe2Tx5wPuONVZUZaW', 'Test', 'User', 'couple', NULL, 1, 1, 1, NULL, '2025-10-24 07:04:13', '2025-10-24 07:04:13', NULL, NULL),
+(54, 'testuser20251024090502', 'test20251024090502@example.com', '$2a$10$5SRBdwti1E67sST2Vc1f1eo2pM9rJZIRAIam8P8l720yBjpIiIXoO', 'Test', 'User', 'couple', NULL, 1, 1, 1, NULL, '2025-10-24 07:05:02', '2025-10-24 07:05:02', NULL, NULL),
+(56, 'johndoe20251024090657', 'john.doe20251024090657@example.com', '$2a$10$R3R5tvx9QRavRb9b95RJjuC5ljEqgy9SKjtD.c7b6gBOllWqEjoxS', 'John', 'Doe', 'couple', '+250 788 123 456', 1, 1, 1, NULL, '2025-10-24 07:06:57', '2025-10-24 07:06:57', NULL, NULL),
+(57, 'johndoe20251024090727', 'john.doe20251024090727@example.com', '$2a$10$qrvdEE18zCB6DS5MlkO3H.4ZXzJmLzPyJdEAD0CoDHZHK8aifArC6', 'John', 'Doe', 'couple', NULL, 1, 1, 1, NULL, '2025-10-24 07:07:27', '2025-10-24 07:07:27', NULL, NULL),
+(58, 'frontend20251024090811', 'frontend20251024090811@test.com', '$2a$10$OeJ9TDOnMutvKEyyRLFd9.KTxCN9h4VQ5QYnNFZpFt4ZODLWImt2u', 'Frontend', 'Test', 'couple', '+250 788 999 888', 1, 1, 1, '2025-10-24 07:08:36', '2025-10-24 07:08:12', '2025-10-24 07:08:36', NULL, NULL),
+(59, 'dhozana529@gmail.com', 'churchleader2@gmail.com', '$2a$10$YO9r0yvTWwsJ1Oey/F/MIu8ZpAJREGCHhNo0beQtKUKrFQscTVsD6', 'hozana', 'DUSABIMANA Hozana', 'couple', '0785419324', 1, 1, 1, NULL, '2025-10-24 07:09:22', '2025-10-24 07:09:22', NULL, NULL),
+(60, 'dhozana4', 'churchleaders4@gmail.com', '$2a$10$XNRg1h.Z03hbF7sxfBjsAug4Jqw6IG89ls8/IBmfi.K2QaJujGkqe', 'hozana', 'DUSABIMANA Hozana', 'church_leader', '0785419324', 1, 1, 1, NULL, '2025-10-24 07:09:43', '2025-10-24 07:09:43', NULL, NULL),
+(61, 'civiladmin3', 'civiladmin3@gmail.com', '$2a$10$AHLm10b5HY59keI//4Mu..sjxbefa4oLTiV1bbUMPN6mif157TlFy', 'hozana', 'DUSABIMANA Hozana', 'civil_admin', '0785419324', 1, 1, 0, NULL, '2025-10-24 07:10:29', '2025-10-24 07:10:29', NULL, NULL),
+(62, 'admin20251024091739', 'admin20251024091739@test.com', '$2a$10$fTUXlcvZ27740Ub1mTl9k.eAK6K45p86XRxiJybBN/1dOolZHf3oe', 'Admin', 'User', 'civil_admin', NULL, 1, 1, 0, '2025-10-24 07:24:03', '2025-10-24 07:17:40', '2025-10-24 07:24:03', NULL, NULL),
+(63, 'civiladmin7', 'civiladmin7@gmail.com', '$2a$10$jSQtQ8lqrVhInUcY8InvA.A0KJwMACFczp135FAYPm4A4tBwGE65y', 'hozana', 'DUSABIMANA Hozana', 'civil_admin', '0785419324', 1, 1, 0, '2025-10-29 19:06:31', '2025-10-24 07:27:27', '2025-10-29 19:06:31', NULL, NULL),
+(64, 'civiladmin34', 'dhozana5534@gmail.com', '$2a$10$mG2ohcXRadVniVLS93261OhRvU2s97A2k2a/fKExqheUhDdJaaFUe', 'hozana', 'hozana', 'couple', '0785419324', 1, 1, 1, NULL, '2025-10-24 07:34:30', '2025-10-24 07:34:30', NULL, NULL),
+(65, 'danny1', 'couple1@gmail.com', '$2a$10$8SuRN7Q27JbouPkg1u4D6OnkUv.59uhPkegL/su2bXhqWLGVC.d7e', 'Danny', 'Vumbi', 'couple', '0789735484', 1, 1, 1, '2025-10-24 14:28:58', '2025-10-24 07:51:14', '2025-10-24 14:28:58', NULL, NULL),
+(66, 'Cynthia@123', 'igihozo@gmail.com', '$2a$10$GEhf/QiL2SyQSYGTvubF1OZ7N1Vtlm3YUQKXMpvKYIoGQrJeXB5Re', 'Igihozo', 'Cynthia', 'church_leader', '0785419324', 1, NULL, 1, '2025-11-17 12:47:03', '2025-10-24 12:32:25', '2025-11-17 12:47:03', NULL, NULL),
+(67, 'coupletest', 'coupletest@example.com', '$2a$10$3pFRNzanpFKbY/in3.INleJbJspYA/CEhOVYuRIsa6QrzvPYYufKW', 'John', 'Doe', 'couple', '+250788111111', 1, 1, 1, NULL, '2025-10-24 15:17:46', '2025-10-24 15:17:46', NULL, NULL),
+(68, 'danny12', 'mahorodocile2@gmail.com', '$2a$10$h2xzMAEgBVVLQtp.10Z2D.4snjmaySCLcyNIWCax7jQvofEzM0o1K', 'Danny', 'Vumbi', 'couple', '0789735482', 1, 1, 1, NULL, '2025-10-24 15:22:24', '2025-10-24 15:22:24', NULL, NULL),
+(69, 'admin23', 'civiladmin23@gmail.com', '$2a$10$VIsqRNqdG0xJgddqUKEvkuvam8ge7dHdEoCOX1nH6jMS90OjpMiSi', 'Hozana', 'DUSABIMANA', 'civil_admin', '0791724884', 1, 1, 0, NULL, '2025-10-25 20:32:43', '2025-10-25 20:32:43', NULL, NULL),
+(70, 'Hozana23', 'marriage@gmail.com', '$2a$10$jSQtQ8lqrVhInUcY8InvA.A0KJwMACFczp135FAYPm4A4tBwGE65y', 'Hozana', 'DUSABIMANA', 'couple', '0791724884', 1, 1, 1, '2025-10-26 10:12:22', '2025-10-25 20:43:18', '2025-10-26 10:12:22', NULL, NULL),
+(71, 'Igihoz', 'igihozor5@gmail.com', '$2a$10$wh0AnPh5VzitAA5fxcVikuBhV.ga7mxuUVKasc3tyC/RBg7ydai3W', 'Igihozo', 'Cynthia', 'couple', '0785419324', 1, 1, 1, '2025-10-29 18:14:36', '2025-10-27 19:38:54', '2025-10-29 18:14:36', NULL, NULL),
+(72, 'testchurchleader', 'testchurchleader@test.com', '$2a$10$viPVZ8M.GbNfaJdQ3jXPdOhY2NiYRjh1tUsPTpTY3g6m/Y1ltB4Ze', 'Test', 'Church Leader', 'church_leader', NULL, 1, NULL, 1, NULL, '2025-10-29 18:25:40', '2025-10-29 18:25:40', NULL, NULL),
+(73, 'Hozana2', 'hozanadusabimana4@gmail.com', '$2a$10$oWu00/AYxvdW.tN8vf39AeZZ/jUlrN6YPdJVRJ4br2ZXpgRARvte6', 'Hozana3', 'DUSABIMANA', 'couple', '0791724884', 5, 4, 1, NULL, '2025-11-12 20:29:09', '2025-11-12 20:29:09', NULL, NULL),
+(74, 'Hozana20', 'nadia20@gmail.com', '$2a$10$GEhf/QiL2SyQSYGTvubF1OZ7N1Vtlm3YUQKXMpvKYIoGQrJeXB5Re', 'Hozana20', 'DUSABIMANA', 'couple', '0791724884', 1, NULL, 1, '2025-11-17 12:47:47', '2025-11-17 12:26:44', '2025-11-17 12:47:47', NULL, NULL),
+(75, 'Jado', 'student@gmail.com', '$2a$10$GEhf/QiL2SyQSYGTvubF1OZ7N1Vtlm3YUQKXMpvKYIoGQrJeXB5Re', 'Hozana', 'DUSABIMANA', 'couple', '0791724884', 7, NULL, 1, NULL, '2025-11-17 12:43:44', '2025-11-17 12:43:44', NULL, NULL);
 
 --
 -- Indexes for dumped tables
@@ -503,7 +640,16 @@ ALTER TABLE `marriage_applications`
   ADD KEY `church_id` (`church_id`),
   ADD KEY `sector_id` (`sector_id`),
   ADD KEY `civil_admin_id` (`civil_admin_id`),
-  ADD KEY `church_leader_id` (`church_leader_id`);
+  ADD KEY `church_leader_id` (`church_leader_id`),
+  ADD KEY `completed_by` (`completed_by`),
+  ADD KEY `civil_completed_by` (`civil_completed_by`);
+
+--
+-- Indexes for table `member_notifications`
+--
+ALTER TABLE `member_notifications`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `member_id` (`member_id`);
 
 --
 -- Indexes for table `notifications`
@@ -590,6 +736,21 @@ ALTER TABLE `service_comments`
   ADD KEY `member_id` (`member_id`);
 
 --
+-- Indexes for table `service_requests`
+--
+ALTER TABLE `service_requests`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `request_number` (`request_number`),
+  ADD KEY `related_service_id` (`related_service_id`),
+  ADD KEY `assigned_to_id` (`assigned_to_id`),
+  ADD KEY `reviewed_by` (`reviewed_by`),
+  ADD KEY `idx_member_id` (`member_id`),
+  ADD KEY `idx_service_type` (`service_type`),
+  ADD KEY `idx_status` (`status`),
+  ADD KEY `idx_requested_date` (`requested_date`),
+  ADD KEY `idx_created_at` (`created_at`);
+
+--
 -- Indexes for table `users`
 --
 ALTER TABLE `users`
@@ -666,7 +827,7 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `certificate_requests`
 --
 ALTER TABLE `certificate_requests`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
 
 --
 -- AUTO_INCREMENT for table `churches`
@@ -696,13 +857,19 @@ ALTER TABLE `documents`
 -- AUTO_INCREMENT for table `marriage_applications`
 --
 ALTER TABLE `marriage_applications`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
+
+--
+-- AUTO_INCREMENT for table `member_notifications`
+--
+ALTER TABLE `member_notifications`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
 
 --
 -- AUTO_INCREMENT for table `notifications`
 --
 ALTER TABLE `notifications`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=22;
 
 --
 -- AUTO_INCREMENT for table `sectors`
@@ -714,13 +881,19 @@ ALTER TABLE `sectors`
 -- AUTO_INCREMENT for table `service_comments`
 --
 ALTER TABLE `service_comments`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+
+--
+-- AUTO_INCREMENT for table `service_requests`
+--
+ALTER TABLE `service_requests`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=69;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=76;
 
 --
 -- Constraints for dumped tables
@@ -770,7 +943,15 @@ ALTER TABLE `marriage_applications`
   ADD CONSTRAINT `marriage_applications_ibfk_89` FOREIGN KEY (`church_id`) REFERENCES `churches` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
   ADD CONSTRAINT `marriage_applications_ibfk_90` FOREIGN KEY (`sector_id`) REFERENCES `sectors` (`id`) ON DELETE NO ACTION ON UPDATE CASCADE,
   ADD CONSTRAINT `marriage_applications_ibfk_91` FOREIGN KEY (`civil_admin_id`) REFERENCES `users` (`id`),
-  ADD CONSTRAINT `marriage_applications_ibfk_92` FOREIGN KEY (`church_leader_id`) REFERENCES `users` (`id`);
+  ADD CONSTRAINT `marriage_applications_ibfk_92` FOREIGN KEY (`church_leader_id`) REFERENCES `users` (`id`),
+  ADD CONSTRAINT `marriage_applications_ibfk_93` FOREIGN KEY (`completed_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `marriage_applications_ibfk_94` FOREIGN KEY (`civil_completed_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `member_notifications`
+--
+ALTER TABLE `member_notifications`
+  ADD CONSTRAINT `member_notifications_ibfk_1` FOREIGN KEY (`member_id`) REFERENCES `church_members` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `notifications`
@@ -784,6 +965,15 @@ ALTER TABLE `notifications`
 ALTER TABLE `service_comments`
   ADD CONSTRAINT `service_comments_ibfk_1` FOREIGN KEY (`service_id`) REFERENCES `church_services` (`id`) ON DELETE NO ACTION ON UPDATE CASCADE,
   ADD CONSTRAINT `service_comments_ibfk_2` FOREIGN KEY (`member_id`) REFERENCES `church_members` (`id`) ON DELETE NO ACTION ON UPDATE CASCADE;
+
+--
+-- Constraints for table `service_requests`
+--
+ALTER TABLE `service_requests`
+  ADD CONSTRAINT `service_requests_ibfk_1` FOREIGN KEY (`member_id`) REFERENCES `church_members` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `service_requests_ibfk_2` FOREIGN KEY (`related_service_id`) REFERENCES `church_services` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `service_requests_ibfk_3` FOREIGN KEY (`assigned_to_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `service_requests_ibfk_4` FOREIGN KEY (`reviewed_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
 
 --
 -- Constraints for table `users`

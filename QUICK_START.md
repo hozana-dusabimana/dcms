@@ -42,9 +42,9 @@
 - Navigate through all dashboard sections
 
 ### **5. Test API Endpoints**
-- Health check: http://localhost:5000/api/health
-- Sectors: http://localhost:5000/api/sectors
-- Services: http://localhost:5000/api/services
+- Health check: https://dcmsbackend.lanari.rw/api/health
+- Sectors: https://dcmsbackend.lanari.rw/api/sectors
+- Services: https://dcmsbackend.lanari.rw/api/services
 
 ---
 
@@ -216,9 +216,9 @@ Your DMCS MIS application is fully functional and ready for use. All core featur
 - Navigate through all dashboard sections
 
 ### **5. Test API Endpoints**
-- Health check: http://localhost:5000/api/health
-- Sectors: http://localhost:5000/api/sectors
-- Services: http://localhost:5000/api/services
+- Health check: https://dcmsbackend.lanari.rw/api/health
+- Sectors: https://dcmsbackend.lanari.rw/api/sectors
+- Services: https://dcmsbackend.lanari.rw/api/services
 
 ---
 

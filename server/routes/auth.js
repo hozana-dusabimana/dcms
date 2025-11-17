@@ -25,7 +25,7 @@ router.post('/register', [
     body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
     body('firstName').notEmpty().withMessage('First name is required'),
     body('lastName').notEmpty().withMessage('Last name is required'),
-    body('userType').isIn(['couple', 'church_leader', 'civil_admin']).withMessage('Invalid user type')
+    body('userType').isIn(['couple']).withMessage('Invalid user type')
 ], async (req, res) => {
     try {
         console.log('Registration request received:', req.body);
@@ -36,7 +36,7 @@ router.post('/register', [
             return res.status(400).json({ errors: errors.array() });
         }
 
-        const { username, email, password, firstName, lastName, userType, phone, church, sector } = req.body;
+        const { username, email, password, firstName, lastName, userType, phone, church } = req.body;
 
         // Check if user already exists
         const existingUser = await User.findOne({
@@ -61,7 +61,7 @@ router.post('/register', [
             userType,
             phone,
             churchId: church && church !== '' ? church : null,
-            sectorId: sector && sector !== '' ? sector : null
+            sectorId: null
         });
 
         // Generate token

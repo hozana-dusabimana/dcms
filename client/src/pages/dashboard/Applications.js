@@ -39,7 +39,6 @@ import {
     Search as SearchIcon,
     FilterList as FilterIcon,
     Event as CompleteIcon,
-    Gavel as CivilCompleteIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
@@ -68,13 +67,6 @@ const Applications = () => {
         comments: ''
     });
 
-    // Civil complete marriage dialog state
-    const [civilCompleteDialogOpen, setCivilCompleteDialogOpen] = useState(false);
-    const [civilCompleteForm, setCivilCompleteForm] = useState({
-        civilMarriageDate: '',
-        civilMarriageLocation: '',
-        comments: ''
-    });
 
     // Build query parameters
     const queryParams = useMemo(() => {
@@ -99,33 +91,6 @@ const Applications = () => {
     const applications = applicationsData?.applications || [];
     const pagination = applicationsData?.pagination || {};
 
-    // Sector approve application mutation (Civil Admin)
-    const sectorApproveMutation = useMutation(
-        (applicationId) => api.put(`/applications/${applicationId}/sector-approve`),
-        {
-            onSuccess: () => {
-                queryClient.invalidateQueries(['applications']);
-                toast.success('Application approved at sector level');
-            },
-            onError: (error) => {
-                toast.error(error.response?.data?.message || 'Failed to approve application');
-            },
-        }
-    );
-
-    // Sector reject application mutation (Civil Admin)
-    const sectorRejectMutation = useMutation(
-        ({ applicationId, reason }) => api.put(`/applications/${applicationId}/sector-reject`, { reason }),
-        {
-            onSuccess: () => {
-                queryClient.invalidateQueries(['applications']);
-                toast.success('Application rejected at sector level');
-            },
-            onError: (error) => {
-                toast.error(error.response?.data?.message || 'Failed to reject application');
-            },
-        }
-    );
 
     // Church approve application mutation (Church Leader)
     const churchApproveMutation = useMutation(
@@ -171,36 +136,19 @@ const Applications = () => {
         }
     );
 
-    // Civil complete marriage mutation (Civil Admin)
-    const civilCompleteMarriageMutation = useMutation(
-        ({ applicationId, data }) => api.put(`/applications/${applicationId}/civil-complete`, data),
-        {
-            onSuccess: () => {
-                queryClient.invalidateQueries(['applications']);
-                toast.success('Civil marriage marked as completed successfully');
-                setCivilCompleteDialogOpen(false);
-                setCivilCompleteForm({ civilMarriageDate: '', civilMarriageLocation: '', comments: '' });
-            },
-            onError: (error) => {
-                toast.error(error.response?.data?.message || 'Failed to complete civil marriage');
-            },
-        }
-    );
 
     const getStatusColor = (status) => {
         switch (status) {
             case 'pending': return 'warning';
             case 'under_review': return 'info';
-            case 'sector_approved': return 'primary';
             case 'approved': return 'success';
             case 'rejected': return 'error';
             case 'completed': return 'success';
-            case 'civil_completed': return 'info';
             default: return 'default';
         }
     };
 
-    const canReview = user?.userType === 'church_leader' || user?.userType === 'civil_admin';
+    const canReview = user?.userType === 'church_leader';
 
     // Server-side filtering is now handled by the API
 
@@ -209,9 +157,7 @@ const Applications = () => {
     };
 
     const handleApprove = (applicationId) => {
-        if (user?.userType === 'civil_admin') {
-            sectorApproveMutation.mutate(applicationId);
-        } else if (user?.userType === 'church_leader') {
+        if (user?.userType === 'church_leader') {
             churchApproveMutation.mutate(applicationId);
         }
     };
@@ -219,9 +165,7 @@ const Applications = () => {
     const handleReject = (applicationId) => {
         const reason = prompt('Please provide a reason for rejection:');
         if (reason) {
-            if (user?.userType === 'civil_admin') {
-                sectorRejectMutation.mutate({ applicationId, reason });
-            } else if (user?.userType === 'church_leader') {
+            if (user?.userType === 'church_leader') {
                 churchRejectMutation.mutate({ applicationId, reason });
             }
         }
@@ -249,49 +193,21 @@ const Applications = () => {
         });
     };
 
-    const handleCivilCompleteMarriage = (application) => {
-        setSelectedApplication(application);
-        setCivilCompleteForm({
-            civilMarriageDate: application.marriageDate || '',
-            civilMarriageLocation: '',
-            comments: ''
-        });
-        setCivilCompleteDialogOpen(true);
-    };
-
-    const handleSubmitCivilComplete = () => {
-        if (!civilCompleteForm.civilMarriageDate || !civilCompleteForm.civilMarriageLocation) {
-            toast.error('Please fill in all required fields');
-            return;
-        }
-
-        civilCompleteMarriageMutation.mutate({
-            applicationId: selectedApplication.id,
-            data: civilCompleteForm
-        });
-    };
 
     // Check if user can approve/reject based on application status and user type
     const canApproveReject = (application) => {
         if (!canReview) return false;
 
-        if (user?.userType === 'civil_admin') {
+        if (user?.userType === 'church_leader') {
             return ['pending', 'under_review'].includes(application.status);
-        } else if (user?.userType === 'church_leader') {
-            return application.status === 'sector_approved';
         }
 
         return false;
     };
 
-    // Check if user can complete marriage (only church leaders for sector_approved, approved, or civil_completed applications)
+    // Check if user can complete marriage (only church leaders for approved applications)
     const canCompleteMarriage = (application) => {
-        return user?.userType === 'church_leader' && ['sector_approved', 'approved', 'civil_completed'].includes(application.status);
-    };
-
-    // Check if user can complete civil marriage (only civil admins for sector_approved or approved applications)
-    const canCompleteCivilMarriage = (application) => {
-        return user?.userType === 'civil_admin' && ['sector_approved', 'approved'].includes(application.status);
+        return user?.userType === 'church_leader' && application.status === 'approved';
     };
 
     if (isLoading) {
@@ -321,9 +237,7 @@ const Applications = () => {
                     title="Marriage Applications"
                     subtitle={user?.userType === 'couple'
                         ? 'View and track your marriage applications'
-                        : user?.userType === 'church_leader'
-                            ? 'Review and manage marriage applications (excluding pending)'
-                            : 'Review and manage marriage applications'
+                        : 'Review and manage marriage applications in your church'
                     }
                     actionButton={user?.userType === 'couple' ? (
                         <Button
@@ -371,7 +285,6 @@ const Applications = () => {
                                         <MenuItem value="all">All Statuses</MenuItem>
                                         <MenuItem value="pending">Pending</MenuItem>
                                         <MenuItem value="under_review">Under Review</MenuItem>
-                                        <MenuItem value="sector_approved">Sector Approved</MenuItem>
                                         <MenuItem value="approved">Approved</MenuItem>
                                         <MenuItem value="rejected">Rejected</MenuItem>
                                         <MenuItem value="completed">Completed</MenuItem>
@@ -449,34 +362,20 @@ const Applications = () => {
                                             </Tooltip>
                                             {canApproveReject(application) && (
                                                 <>
-                                                    <Tooltip title={
-                                                        user?.userType === 'civil_admin'
-                                                            ? "Sector Approve"
-                                                            : "Church Approve"
-                                                    }>
+                                                    <Tooltip title="Church Approve">
                                                         <IconButton
                                                             onClick={() => handleApprove(application.id)}
                                                             color="success"
-                                                            disabled={
-                                                                (user?.userType === 'civil_admin' && sectorApproveMutation.isLoading) ||
-                                                                (user?.userType === 'church_leader' && churchApproveMutation.isLoading)
-                                                            }
+                                                            disabled={churchApproveMutation.isLoading}
                                                         >
                                                             <ApproveIcon />
                                                         </IconButton>
                                                     </Tooltip>
-                                                    <Tooltip title={
-                                                        user?.userType === 'civil_admin'
-                                                            ? "Sector Reject"
-                                                            : "Church Reject"
-                                                    }>
+                                                    <Tooltip title="Church Reject">
                                                         <IconButton
                                                             onClick={() => handleReject(application.id)}
                                                             color="error"
-                                                            disabled={
-                                                                (user?.userType === 'civil_admin' && sectorRejectMutation.isLoading) ||
-                                                                (user?.userType === 'church_leader' && churchRejectMutation.isLoading)
-                                                            }
+                                                            disabled={churchRejectMutation.isLoading}
                                                         >
                                                             <RejectIcon />
                                                         </IconButton>
@@ -491,17 +390,6 @@ const Applications = () => {
                                                         disabled={completeMarriageMutation.isLoading}
                                                     >
                                                         <CompleteIcon />
-                                                    </IconButton>
-                                                </Tooltip>
-                                            )}
-                                            {canCompleteCivilMarriage(application) && (
-                                                <Tooltip title="Complete Civil Marriage">
-                                                    <IconButton
-                                                        onClick={() => handleCivilCompleteMarriage(application)}
-                                                        color="secondary"
-                                                        disabled={civilCompleteMarriageMutation.isLoading}
-                                                    >
-                                                        <CivilCompleteIcon />
                                                     </IconButton>
                                                 </Tooltip>
                                             )}
@@ -525,9 +413,7 @@ const Applications = () => {
                                     ? 'Try adjusting your search criteria or filters.'
                                     : user?.userType === 'couple'
                                         ? 'You haven\'t submitted any marriage applications yet.'
-                                        : user?.userType === 'church_leader'
-                                            ? 'There are no sector-approved applications to review at the moment.'
-                                            : 'There are no applications to review at the moment.'
+                                        : 'There are no applications to review at the moment.'
                                 }
                             </Typography>
                             {user?.userType === 'couple' && (
@@ -624,65 +510,6 @@ const Applications = () => {
                     </DialogActions>
                 </Dialog>
 
-                {/* Civil Complete Marriage Dialog */}
-                <Dialog
-                    open={civilCompleteDialogOpen}
-                    onClose={() => setCivilCompleteDialogOpen(false)}
-                    maxWidth="sm"
-                    fullWidth
-                >
-                    <DialogTitle>Complete Civil Marriage</DialogTitle>
-                    <DialogContent>
-                        {selectedApplication && (
-                            <Box sx={{ mb: 2 }}>
-                                <Typography variant="body2" color="text.secondary">
-                                    Completing civil marriage for: <strong>{selectedApplication.groomFirstName} {selectedApplication.groomLastName}</strong> & <strong>{selectedApplication.brideFirstName} {selectedApplication.brideLastName}</strong>
-                                </Typography>
-                            </Box>
-                        )}
-                        <TextField
-                            fullWidth
-                            label="Civil Marriage Date"
-                            type="date"
-                            value={civilCompleteForm.civilMarriageDate}
-                            onChange={(e) => setCivilCompleteForm(prev => ({ ...prev, civilMarriageDate: e.target.value }))}
-                            margin="normal"
-                            required
-                            InputLabelProps={{ shrink: true }}
-                        />
-                        <TextField
-                            fullWidth
-                            label="Civil Marriage Location"
-                            value={civilCompleteForm.civilMarriageLocation}
-                            onChange={(e) => setCivilCompleteForm(prev => ({ ...prev, civilMarriageLocation: e.target.value }))}
-                            margin="normal"
-                            required
-                            placeholder="e.g., Civil Registry Office, Kigali"
-                        />
-                        <TextField
-                            fullWidth
-                            label="Comments (Optional)"
-                            multiline
-                            rows={3}
-                            value={civilCompleteForm.comments}
-                            onChange={(e) => setCivilCompleteForm(prev => ({ ...prev, comments: e.target.value }))}
-                            margin="normal"
-                            placeholder="Any additional notes about the civil ceremony..."
-                        />
-                    </DialogContent>
-                    <DialogActions>
-                        <Button onClick={() => setCivilCompleteDialogOpen(false)}>
-                            Cancel
-                        </Button>
-                        <Button
-                            onClick={handleSubmitCivilComplete}
-                            variant="contained"
-                            disabled={civilCompleteMarriageMutation.isLoading}
-                        >
-                            {civilCompleteMarriageMutation.isLoading ? 'Completing...' : 'Complete Civil Marriage'}
-                        </Button>
-                    </DialogActions>
-                </Dialog>
             </Container>
         </Box>
     );

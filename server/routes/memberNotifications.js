@@ -139,3 +139,8 @@ router.delete('/:id', memberAuth, async (req, res) => {
 
 module.exports = router;
 
+
+
+
+
+

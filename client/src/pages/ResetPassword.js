@@ -12,6 +12,7 @@ import {
 } from '@mui/material';
 import { useParams, useNavigate, Link as RouterLink } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
+import { getValidationRules } from '../utils/validations';
 import axios from '../config/axios';
 
 const ResetPassword = () => {
@@ -142,16 +143,14 @@ const ResetPassword = () => {
                         <Controller
                             name="password"
                             control={control}
-                            rules={{
-                                required: 'Password is required',
-                                minLength: { value: 6, message: 'Password must be at least 6 characters' }
-                            }}
+                            rules={getValidationRules.password()}
                             render={({ field }) => (
                                 <TextField
                                     {...field}
                                     fullWidth
                                     label="New Password"
                                     type="password"
+                                    placeholder="Enter at least 6 characters"
                                     error={!!errors.password}
                                     helperText={errors.password?.message}
                                 />
@@ -161,16 +160,14 @@ const ResetPassword = () => {
                         <Controller
                             name="confirmPassword"
                             control={control}
-                            rules={{
-                                required: 'Please confirm your password',
-                                validate: value => value === password || 'Passwords do not match'
-                            }}
+                            rules={getValidationRules.confirmPassword(password)}
                             render={({ field }) => (
                                 <TextField
                                     {...field}
                                     fullWidth
                                     label="Confirm New Password"
                                     type="password"
+                                    placeholder="Confirm your password"
                                     error={!!errors.confirmPassword}
                                     helperText={errors.confirmPassword?.message}
                                 />

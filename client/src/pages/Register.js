@@ -21,6 +21,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { useAuth } from '../contexts/AuthContext';
 import { useQuery } from 'react-query';
 import api from '../config/axios';
+import { getValidationRules } from '../utils/validations';
 
 const Register = () => {
     const [loading, setLoading] = useState(false);
@@ -42,21 +43,15 @@ const Register = () => {
             phone: '',
             password: '',
             church: '',
-            sector: '',
         },
     });
 
     const userType = watch('userType');
 
-    // Fetch churches and sectors for couples, church leaders and civil admins
+    // Fetch churches for couples
     const { data: churches } = useQuery('churches', () =>
         api.get('/churches').then(res => res.data || []),
-        { enabled: userType === 'couple' || userType === 'church_leader' }
-    );
-
-    const { data: sectors } = useQuery('sectors', () =>
-        api.get('/sectors').then(res => res.data || []),
-        { enabled: userType === 'couple' || userType === 'civil_admin' }
+        { enabled: userType === 'couple' }
     );
 
     const onSubmit = async (data) => {
@@ -67,8 +62,7 @@ const Register = () => {
         const cleanedData = {
             ...data,
             phone: data.phone || null,
-            church: data.church && data.church !== '' ? data.church : null,
-            sector: data.sector && data.sector !== '' ? data.sector : null
+            church: data.church && data.church !== '' ? data.church : null
         };
 
         console.log('Submitting registration data:', cleanedData);
@@ -127,10 +121,8 @@ const Register = () => {
                                     render={({ field }) => (
                                         <FormControl fullWidth error={!!errors.userType}>
                                             <InputLabel>Account Type</InputLabel>
-                                            <Select {...field} label="Account Type">
+                                            <Select {...field} label="Account Type" disabled>
                                                 <MenuItem value="couple">Couple</MenuItem>
-                                                <MenuItem value="church_leader">Church Leader</MenuItem>
-                                                <MenuItem value="civil_admin">Civil Administrator</MenuItem>
                                             </Select>
                                         </FormControl>
                                     )}
@@ -195,19 +187,14 @@ const Register = () => {
                                 <Controller
                                     name="email"
                                     control={control}
-                                    rules={{
-                                        required: 'Email is required',
-                                        pattern: {
-                                            value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                                            message: 'Invalid email address',
-                                        },
-                                    }}
+                                    rules={getValidationRules.email()}
                                     render={({ field }) => (
                                         <TextField
                                             {...field}
                                             fullWidth
                                             label="Email Address"
                                             type="email"
+                                            placeholder="Enter valid email address"
                                             error={!!errors.email}
                                             helperText={errors.email?.message}
                                         />
@@ -219,13 +206,21 @@ const Register = () => {
                                 <Controller
                                     name="phone"
                                     control={control}
+                                    rules={getValidationRules.phone()}
                                     render={({ field }) => (
                                         <TextField
                                             {...field}
                                             fullWidth
                                             label="Phone Number"
+                                            placeholder="Enter 10 or 13 digit phone number"
                                             error={!!errors.phone}
                                             helperText={errors.phone?.message}
+                                            onChange={(e) => {
+                                                // Only allow digits
+                                                const value = e.target.value.replace(/\D/g, '');
+                                                field.onChange(value);
+                                            }}
+                                            inputProps={{ maxLength: 13 }}
                                         />
                                     )}
                                 />
@@ -235,16 +230,14 @@ const Register = () => {
                                 <Controller
                                     name="password"
                                     control={control}
-                                    rules={{
-                                        required: 'Password is required',
-                                        minLength: { value: 6, message: 'Password must be at least 6 characters' }
-                                    }}
+                                    rules={getValidationRules.password()}
                                     render={({ field }) => (
                                         <TextField
                                             {...field}
                                             fullWidth
                                             label="Password"
                                             type="password"
+                                            placeholder="Enter at least 6 characters"
                                             error={!!errors.password}
                                             helperText={errors.password?.message}
                                         />
@@ -252,9 +245,9 @@ const Register = () => {
                                 />
                             </Grid>
 
-                            {/* Church selection for couples and church leaders */}
-                            {(userType === 'couple' || userType === 'church_leader') && (
-                                <Grid item xs={12} sm={6}>
+                            {/* Church selection for couples */}
+                            {userType === 'couple' && (
+                                <Grid item xs={12}>
                                     <Controller
                                         name="church"
                                         control={control}
@@ -271,32 +264,6 @@ const Register = () => {
                                                 </Select>
                                                 {errors.church && (
                                                     <FormHelperText error>{errors.church.message}</FormHelperText>
-                                                )}
-                                            </FormControl>
-                                        )}
-                                    />
-                                </Grid>
-                            )}
-
-                            {/* Sector selection for couples and civil admins */}
-                            {(userType === 'couple' || userType === 'civil_admin') && (
-                                <Grid item xs={12} sm={6}>
-                                    <Controller
-                                        name="sector"
-                                        control={control}
-                                        rules={{ required: 'Civil sector selection is required' }}
-                                        render={({ field }) => (
-                                            <FormControl fullWidth error={!!errors.sector}>
-                                                <InputLabel>Civil Sector</InputLabel>
-                                                <Select {...field} label="Civil Sector">
-                                                    {sectors && Array.isArray(sectors) && sectors.map((sector) => (
-                                                        <MenuItem key={sector.id} value={sector.id}>
-                                                            {sector.name}
-                                                        </MenuItem>
-                                                    ))}
-                                                </Select>
-                                                {errors.sector && (
-                                                    <FormHelperText error>{errors.sector.message}</FormHelperText>
                                                 )}
                                             </FormControl>
                                         )}

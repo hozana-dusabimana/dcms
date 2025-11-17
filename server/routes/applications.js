@@ -38,7 +38,6 @@ router.get('/', auth, async (req, res) => {
         console.log('Current user details:', {
             id: user.id,
             userType: user.userType,
-            sectorId: user.sectorId,
             churchId: user.churchId
         });
 
@@ -46,13 +45,10 @@ router.get('/', auth, async (req, res) => {
         if (user.userType === 'couple') {
             query.userId = req.userId;
         } else if (user.userType === 'church_leader') {
+            // Church leaders can see all religious applications in their church
             query.churchId = user.churchId;
-            // Church leaders can see all applications except pending ones
-            query.status = { [Op.ne]: 'pending' };
-        } else if (user.userType === 'civil_admin') {
-            // Civil admins can see all applications in their sector for tracking and management
-            query.sectorId = user.sectorId;
-            // Remove status filter to show all applications including approved ones
+            query.ceremonyType = 'religious';
+            // Remove status filter to show all applications including pending ones
         }
 
         // Add search functionality
@@ -112,23 +108,113 @@ router.get('/', auth, async (req, res) => {
 // @access  Private
 router.post('/', auth, async (req, res) => {
     try {
-        console.log('Creating application with data:', {
-            sectorId: req.body.sectorId,
+        console.log('Creating religious marriage application with data:', {
+            churchId: req.body.churchId,
             userId: req.userId,
             groomFirstName: req.body.groomFirstName,
-            groomLastName: req.body.groomLastName
+            groomLastName: req.body.groomLastName,
+            ceremonyType: req.body.ceremonyType,
+            hasUploadedFiles: req.body.uploadedFiles ? req.body.uploadedFiles.length > 0 : false
         });
 
-        const application = await MarriageApplication.create({
+        // Prepare application data
+        let applicationData = {
             ...req.body,
             userId: req.userId,
+        };
+
+        const normalizeDateField = (value, fieldName) => {
+            if (!value) {
+                return null;
+            }
+
+            let raw = value;
+            // Handle Dayjs or similar objects
+            if (raw && typeof raw === 'object') {
+                if (raw.$d instanceof Date) {
+                    raw = raw.$d; // Dayjs internal date
+                } else if (typeof raw.toDate === 'function') {
+                    raw = raw.toDate(); // Dayjs/Moment API
+                }
+            }
+
+            const date = raw instanceof Date ? raw : new Date(raw);
+
+            if (Number.isNaN(date.getTime())) {
+                const error = new Error(`Invalid date provided for ${fieldName}`);
+                error.statusCode = 400;
+                throw error;
+            }
+
+            const utcMidnight = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+            return utcMidnight.toISOString().split('T')[0];
+        };
+
+        const dateFields = ['groomDateOfBirth', 'brideDateOfBirth', 'marriageDate', 'civilMarriageDate'];
+
+        applicationData = dateFields.reduce((acc, field) => {
+            if (acc[field]) {
+                acc[field] = normalizeDateField(acc[field], field);
+            }
+            return acc;
+        }, applicationData);
+
+        // Normalize numeric identifiers
+        const numericFields = ['churchId'];
+        numericFields.forEach((field) => {
+            if (applicationData[field] !== undefined && applicationData[field] !== null && applicationData[field] !== '') {
+                const parsed = parseInt(applicationData[field], 10);
+                if (Number.isNaN(parsed)) {
+                    const error = new Error(`Invalid value for ${field}`);
+                    error.statusCode = 400;
+                    throw error;
+                }
+                applicationData[field] = parsed;
+            } else {
+                applicationData[field] = null;
+            }
         });
 
-        console.log('Application created successfully:', {
+        // Ensure church is required for religious applications
+        if (!applicationData.churchId) {
+            const error = new Error('Church selection is required');
+            error.statusCode = 400;
+            throw error;
+        }
+
+        // Set ceremony type to religious and remove sector
+        applicationData.ceremonyType = 'religious';
+        applicationData.sectorId = null;
+
+        // Handle uploaded files
+        if (req.body.uploadedFiles && Array.isArray(req.body.uploadedFiles)) {
+            applicationData.documents = {
+                uploadedFiles: req.body.uploadedFiles,
+                uploadedAt: new Date().toISOString()
+            };
+        }
+
+        if (!applicationData.applicationNumber) {
+            const pad = (n) => n.toString().padStart(4, '0');
+            const date = new Date();
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            const rand = Math.floor(Math.random() * 10000);
+            applicationData.applicationNumber = `APP-${y}${m}${d}-${pad(rand)}`;
+        }
+
+        console.log('Attempting to create application with data:', JSON.stringify(applicationData, null, 2));
+
+        const application = await MarriageApplication.create(applicationData);
+
+        console.log('Religious marriage application created successfully:', {
             id: application.id,
             applicationNumber: application.applicationNumber,
-            sectorId: application.sectorId,
-            userId: application.userId
+            churchId: application.churchId,
+            ceremonyType: application.ceremonyType,
+            userId: application.userId,
+            hasDocuments: application.documents ? true : false
         });
 
         // Send notification to couple about application submission
@@ -176,9 +262,26 @@ router.post('/', auth, async (req, res) => {
             application,
         });
     } catch (error) {
+        console.log("🔥 Error caught in create application route");
+
         console.error('Create application error:', error);
-        res.status(500).json({ message: 'Server error' });
+
+        const status = error.statusCode || 500;
+
+        // Combine all error info into one comma-separated message
+        const fullMessage = [
+            `Name: ${error.name || 'UnknownError'}`,
+            `Message: ${error.message || 'No message'}`,
+            `Stack: ${error.stack || 'No stack trace'}`,
+            `Details: ${JSON.stringify(error, Object.getOwnPropertyNames(error))}`
+        ].join(', ');
+
+        // Always return the full message, not just "Server error"
+        res.status(status).json({ message: fullMessage });
     }
+
+
+
 });
 
 // @route   GET /api/applications/:id
@@ -386,9 +489,9 @@ router.put('/:id/church-approve', auth, authorize('church_leader'), async (req, 
             return res.status(403).json({ message: 'You can only approve applications in your church' });
         }
 
-        // Check if application is sector-approved
-        if (application.status !== 'sector_approved') {
-            return res.status(400).json({ message: 'Application must be approved by sector before church approval' });
+        // Church leaders can approve applications directly from pending status
+        if (!['pending', 'under_review'].includes(application.status)) {
+            return res.status(400).json({ message: 'Application is not in a state that can be approved' });
         }
 
         await application.update({
@@ -407,7 +510,8 @@ router.put('/:id/church-approve', auth, authorize('church_leader'), async (req, 
                     brideName: `${application.brideFirstName} ${application.brideLastName}`,
                     applicationId: application.applicationNumber,
                     approvedDate: new Date().toLocaleDateString(),
-                    status: 'approved'
+                    status: 'approved',
+                    approvalType: 'Church'
                 });
 
                 // Send email notification
@@ -420,8 +524,8 @@ router.put('/:id/church-approve', auth, authorize('church_leader'), async (req, 
                 // Create in-app notification
                 await Notification.create({
                     userId: application.userId,
-                    title: 'Marriage Application Approved (Church)',
-                    message: `Congratulations! Your marriage application has been fully approved. Application #${application.applicationNumber}`,
+                    title: 'Religious Marriage Application Approved',
+                    message: `Congratulations! Your religious marriage application has been approved by the church. Application #${application.applicationNumber}`,
                     type: 'success',
                     relatedEntityType: 'marriage_application',
                     relatedEntityId: application.id,
@@ -429,7 +533,7 @@ router.put('/:id/church-approve', auth, authorize('church_leader'), async (req, 
                         applicationId: application.id,
                         applicationNumber: application.applicationNumber,
                         status: 'approved',
-                        previousStatus: 'sector_approved'
+                        previousStatus: 'pending'
                     }
                 });
 
@@ -469,9 +573,9 @@ router.put('/:id/church-reject', auth, authorize('church_leader'), async (req, r
             return res.status(403).json({ message: 'You can only reject applications in your church' });
         }
 
-        // Check if application is sector-approved
-        if (application.status !== 'sector_approved') {
-            return res.status(400).json({ message: 'Application must be approved by sector before church rejection' });
+        // Church leaders can reject applications directly from pending status
+        if (!['pending', 'under_review'].includes(application.status)) {
+            return res.status(400).json({ message: 'Application is not in a state that can be rejected' });
         }
 
         await application.update({
@@ -505,8 +609,8 @@ router.put('/:id/church-reject', auth, authorize('church_leader'), async (req, r
                 // Create in-app notification
                 await Notification.create({
                     userId: application.userId,
-                    title: 'Marriage Application Rejected (Church)',
-                    message: `Your marriage application has been rejected at the church level. Application #${application.applicationNumber}`,
+                    title: 'Religious Marriage Application Rejected',
+                    message: `Your religious marriage application has been rejected by the church. Application #${application.applicationNumber}`,
                     type: 'error',
                     relatedEntityType: 'marriage_application',
                     relatedEntityId: application.id,
@@ -514,7 +618,7 @@ router.put('/:id/church-reject', auth, authorize('church_leader'), async (req, r
                         applicationId: application.id,
                         applicationNumber: application.applicationNumber,
                         status: 'rejected',
-                        previousStatus: 'sector_approved',
+                        previousStatus: 'pending',
                         reason: reason
                     }
                 });
@@ -554,9 +658,9 @@ router.put('/:id/complete', auth, authorize('church_leader'), async (req, res) =
             return res.status(403).json({ message: 'You can only complete marriages in your church' });
         }
 
-        // Check if application is approved or civil completed
-        if (!['approved', 'civil_completed'].includes(application.status)) {
-            return res.status(400).json({ message: 'Application must be approved or civil completed before marking as religious completed' });
+        // Check if application is approved
+        if (application.status !== 'approved') {
+            return res.status(400).json({ message: 'Application must be approved before marking as completed' });
         }
 
         await application.update({
